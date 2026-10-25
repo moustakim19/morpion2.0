@@ -27,9 +27,9 @@ create index if not exists players_points_idx on public.players (points desc);
 create table if not exists public.games (
   id            uuid primary key default gen_random_uuid(),
   code          text,                                   -- code de salle (4 caractères)
-  joueur1       uuid references public.players(id) on delete set null, -- violet, commence
-  joueur2       uuid references public.players(id) on delete set null, -- turquoise
-  grille        text not null default repeat('0', 225), -- 225 caractères : 0 vide, 1, 2
+  joueur1       uuid references public.players(id) on delete set null, -- joue les X, commence
+  joueur2       uuid references public.players(id) on delete set null, -- joue les O
+  grille        text not null default repeat('0', 9),   -- 9 caractères : 0 vide, 1 = X, 2 = O
   tour          smallint not null default 1 check (tour in (1, 2)), -- à qui le tour
   gagnant       smallint check (gagnant in (0, 1, 2)),  -- 0 = match nul
   statut        text not null default 'attente'
@@ -53,6 +53,12 @@ create unique index if not exists games_code_actif on public.games (code)
   where statut in ('attente', 'en_cours');
 create index if not exists games_file_rapide on public.games (created_at)
   where rapide and statut = 'attente';
+
+-- Passage de la grille 15 × 15 à la grille 3 × 3 :
+-- les nouvelles parties ont 9 cases, et les anciennes parties pas finies sont annulées
+alter table public.games alter column grille set default repeat('0', 9);
+update public.games set statut = 'annulee', version = version + 1
+  where char_length(grille) <> 9 and statut in ('attente', 'en_cours');
 
 
 -- =====================================================================
@@ -121,8 +127,8 @@ $$;
 create or replace function public._ligne_gagnante(g text, p_case int, p_pion text)
 returns boolean language plpgsql immutable as $$
 declare
-  v_l int := p_case / 15;
-  v_c int := p_case % 15;
+  v_l int := p_case / 3;
+  v_c int := p_case % 3;
   v_dl int[] := array[0, 1, 1, 1];
   v_dc int[] := array[1, 0, 1, -1];
   v_total int; v_pas int; v_sens int; v_ll int; v_cc int;
@@ -134,13 +140,13 @@ begin
       loop
         v_ll := v_l + v_dl[d] * v_pas * v_sens;
         v_cc := v_c + v_dc[d] * v_pas * v_sens;
-        exit when v_ll < 0 or v_ll > 14 or v_cc < 0 or v_cc > 14;   -- bord de la grille
-        exit when substr(g, v_ll * 15 + v_cc + 1, 1) <> p_pion;       -- autre couleur
+        exit when v_ll < 0 or v_ll > 2 or v_cc < 0 or v_cc > 2;       -- bord de la grille
+        exit when substr(g, v_ll * 3 + v_cc + 1, 1) <> p_pion;       -- autre symbole
         v_total := v_total + 1;
         v_pas := v_pas + 1;
       end loop;
     end loop;
-    if v_total >= 5 then return true; end if;
+    if v_total >= 3 then return true; end if;
   end loop;
   return false;
 end $$;
@@ -291,7 +297,7 @@ begin
   if v_num = 0 then raise exception 'Tu ne joues pas dans cette partie'; end if;
   if v_partie.statut <> 'en_cours' then raise exception 'La partie est terminée'; end if;
   if v_partie.tour <> v_num then raise exception 'Ce n''est pas ton tour'; end if;
-  if p_case < 0 or p_case > 224 then raise exception 'Case invalide'; end if;
+  if p_case < 0 or p_case > 8 then raise exception 'Case invalide'; end if;
   if substr(v_partie.grille, p_case + 1, 1) <> '0' then raise exception 'Cette case est déjà prise'; end if;
 
   v_pion := v_num::text;

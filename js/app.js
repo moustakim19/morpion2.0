@@ -13,13 +13,11 @@ const $$ = (selecteur) => document.querySelectorAll(selecteur);
 /* ---------- Constantes ---------- */
 const DUREE_COUP = 30;       // secondes pour jouer un coup en ligne
 const DELAI_ABANDON = 60;    // secondes d'absence avant de perdre par abandon
-const COULEURS = { 1: "#C29BFF", 2: "#6CF5E6" };
-const NOMS = { 1: "Violet", 2: "Turquoise" };
+// Joueur 1 = X (rose → violet), joueur 2 = O (cyan → bleu), comme le logo
+const COULEURS = { 1: "#FF8FD1", 2: "#7DF9FF" };
+const COULEURS_2 = { 1: "#8B5CFF", 2: "#3B82F6" };
+const NOMS = { 1: "X", 2: "O" };
 const NIVEAUX = { facile: "Facile", moyen: "Moyen", difficile: "Difficile" };
-// Les 5 points de repère dessinés sur le plateau
-const ETOILES = new Set([[3, 3], [3, 11], [7, 7], [11, 3], [11, 11]].map(([l, c]) => versIndex(l, c)));
-// Écran tactile ? → 1re touche = aperçu, 2e touche = on pose (évite les erreurs de doigt)
-const TACTILE = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 const PERIMETRE_CHRONO = 2 * Math.PI * 22; // longueur du cercle du chronomètre
 
 /* ---------- L'état du jeu : tout ce qu'il faut retenir ---------- */
@@ -34,8 +32,9 @@ const etat = {
   historique: [],        // liste des cases jouées (pour « Annuler »)
   gagnantes: null,
   verrou: false,         // vrai quand on ne peut pas cliquer (l'ordinateur réfléchit…)
-  apercu: -1,            // case en aperçu (écran tactile)
-  dernierMarque: -1,
+  scores: { 1: 0, 2: 0 },// manches gagnées (hors ligne)
+  scoresJoueurs: {},     // manches gagnées en ligne, par identifiant de joueur
+  revancheEnCours: false,
   derniereFin: null,
   apresConnexion: null,  // action à lancer une fois connecté
   minuteurIA: null,
@@ -138,33 +137,51 @@ async function retour() {
    ========================================================= */
 
 const plateau = $("#plateau");
-const cases = [];
+let cases = [];
 
-/** Crée les 225 cases (une seule fois, au démarrage). */
+/** Le dessin d'un X ou d'un O (SVG). Les traits « se dessinent » grâce au CSS. */
+function svgPion(joueur, anime) {
+  const classe = `pion pion-${joueur === 1 ? "x" : "o"}${anime ? "" : " sans-anim"}`;
+  if (joueur === 1) {
+    return `<svg class="${classe}" viewBox="0 0 100 100" aria-hidden="true">
+      <path class="lueur" d="M26 26 74 74M74 26 26 74"/>
+      <path class="trait t1" d="M26 26 74 74" pathLength="1"/>
+      <path class="trait t2" d="M74 26 26 74" pathLength="1"/>
+      <path class="reflet" d="M29 27 42 40"/>
+    </svg>`;
+  }
+  return `<svg class="${classe}" viewBox="0 0 100 100" aria-hidden="true">
+    <circle class="lueur" cx="50" cy="50" r="25"/>
+    <circle class="trait" cx="50" cy="50" r="25" pathLength="1" transform="rotate(-90 50 50)"/>
+    <path class="reflet" d="M32 40a21 21 0 0 1 13-11"/>
+  </svg>`;
+}
+
+/** Crée les 9 cases (à chaque nouvelle partie, pour rejouer l'animation d'entrée). */
 function construirePlateau() {
+  plateau.innerHTML = "";
+  cases = [];
   for (let i = 0; i < NB_CASES; i++) {
     const bouton = document.createElement("button");
-    bouton.className = "case vide" + (ETOILES.has(i) ? " etoile" : "");
+    bouton.className = "case vide";
     bouton.dataset.i = i;
+    bouton.style.setProperty("--i", i);
     bouton.setAttribute("aria-label", `Ligne ${ligneDe(i) + 1}, colonne ${colonneDe(i) + 1}`);
     plateau.appendChild(bouton);
     cases.push(bouton);
   }
-  // Un seul écouteur pour tout le plateau (plus efficace que 225 écouteurs)
-  plateau.addEventListener("click", (e) => {
-    const bouton = e.target.closest(".case");
-    if (bouton) clicCase(Number(bouton.dataset.i));
-  });
 }
+
+// Un seul écouteur pour tout le plateau (plus simple que 9 écouteurs)
+plateau.addEventListener("click", (e) => {
+  const bouton = e.target.closest(".case");
+  if (bouton) clicCase(Number(bouton.dataset.i));
+});
 
 /** Vide le plateau à l'écran. */
 function reinitialiserPlateau() {
-  cases.forEach((b, i) => {
-    b.className = "case vide" + (ETOILES.has(i) ? " etoile" : "");
-    b.innerHTML = "";
-  });
-  etat.dernierMarque = -1;
-  definirApercu(-1);
+  construirePlateau();
+  plateau.classList.remove("termine");
   cacherLigne();
 }
 
@@ -175,50 +192,48 @@ function dessinerCase(i, anime = true) {
   b.classList.toggle("vide", v === 0);
   b.classList.toggle("j1", v === 1);
   b.classList.toggle("j2", v === 2);
-  b.classList.remove("gagnante");
-  b.innerHTML = v
-    ? `<svg class="gemme${anime ? "" : " sans-anim"}" viewBox="0 0 100 100" aria-hidden="true"><use href="#gemme"/></svg>`
-    : "";
-  if (i === etat.apercu) definirApercu(-1);
+  b.classList.remove("gagnante", "pose");
+  b.innerHTML = v ? svgPion(v, anime) : "";
+  if (v && anime) {
+    void b.offsetWidth; // petite astuce pour relancer l'animation de l'onde
+    b.classList.add("pose");
+  }
 }
 
-/** Entoure le dernier coup joué d'un anneau. */
-function marquerDernier(i) {
-  if (etat.dernierMarque >= 0) cases[etat.dernierMarque].classList.remove("dernier");
-  etat.dernierMarque = i;
-  if (i >= 0) cases[i].classList.add("dernier");
-}
-
-/** Aperçu sur écran tactile. */
-function definirApercu(i) {
-  if (etat.apercu >= 0) cases[etat.apercu].classList.remove("apercu");
-  etat.apercu = i;
-  if (i >= 0) cases[i].classList.add("apercu");
-}
-
-/** Fait briller les gemmes gagnantes et trace le trait lumineux. */
+/** Fait briller les cases gagnantes et trace le trait lumineux. */
 function surlignerGagnantes(gagnantes) {
   gagnantes.forEach((i, k) => {
     cases[i].classList.add("gagnante");
-    const gemme = cases[i].querySelector(".gemme");
-    if (gemme) gemme.style.animationDelay = k * 0.08 + "s";
+    const pion = cases[i].querySelector(".pion");
+    if (pion) pion.style.animationDelay = k * 0.12 + "s";
   });
-  marquerDernier(-1);
+  plateau.classList.add("termine");
   dessinerLigne(gagnantes);
 }
 
+/** Trace le trait d'un bout à l'autre de l'alignement (en débordant un peu). */
 function dessinerLigne(gagnantes) {
   const svg = $("#ligne-victoire");
-  const ligne = svg.querySelector("line");
   const cadre = svg.getBoundingClientRect();
   const a = cases[gagnantes[0]].getBoundingClientRect();
   const b = cases[gagnantes[gagnantes.length - 1]].getBoundingClientRect();
+  let x1 = a.left + a.width / 2 - cadre.left;
+  let y1 = a.top + a.height / 2 - cadre.top;
+  let x2 = b.left + b.width / 2 - cadre.left;
+  let y2 = b.top + b.height / 2 - cadre.top;
+  // On prolonge le trait de 30 % d'une case de chaque côté
+  const dx = (x2 - x1) / (gagnantes.length - 1) * 0.3;
+  const dy = (y2 - y1) / (gagnantes.length - 1) * 0.3;
+  x1 -= dx; y1 -= dy; x2 += dx; y2 += dy;
   svg.setAttribute("viewBox", `0 0 ${cadre.width} ${cadre.height}`);
-  ligne.setAttribute("x1", a.left + a.width / 2 - cadre.left);
-  ligne.setAttribute("y1", a.top + a.height / 2 - cadre.top);
-  ligne.setAttribute("x2", b.left + b.width / 2 - cadre.left);
-  ligne.setAttribute("y2", b.top + b.height / 2 - cadre.top);
-  svg.classList.remove("j1", "j2");
+  svg.querySelectorAll("line").forEach((ligne) => {
+    ligne.setAttribute("x1", x1);
+    ligne.setAttribute("y1", y1);
+    ligne.setAttribute("x2", x2);
+    ligne.setAttribute("y2", y2);
+  });
+  svg.classList.remove("j1", "j2", "visible");
+  void svg.getBoundingClientRect(); // relance l'animation
   svg.classList.add("j" + etat.grille[gagnantes[0]], "visible");
 }
 
@@ -226,13 +241,14 @@ function cacherLigne() {
   $("#ligne-victoire").classList.remove("visible");
 }
 
-/** Explosion de gemmes sur chaque case gagnante, l'une après l'autre. */
+/** Explosion de mini X / O sur chaque case gagnante, l'une après l'autre. */
 function exploser(gagnantes, joueur) {
   gagnantes.forEach((i, k) => {
     setTimeout(() => {
       const r = cases[i].getBoundingClientRect();
-      Effets.explosion(r.left + r.width / 2, r.top + r.height / 2, [COULEURS[joueur], COULEURS[joueur], "#ffffff", joueur === 1 ? "#E4D2FF" : "#C8FFF8"]);
-    }, 250 + k * 110);
+      Effets.explosion(r.left + r.width / 2, r.top + r.height / 2,
+        [COULEURS[joueur], COULEURS_2[joueur], "#ffffff"], [joueur === 1 ? "x" : "o"]);
+    }, 300 + k * 140);
   });
 }
 
@@ -263,10 +279,10 @@ function tempsRestant() {
 /** Nom et sous-titre de chaque joueur selon le mode. */
 function infosJoueurs() {
   if (etat.mode === "local") {
-    return { 1: { nom: "Violet", sous: "Joueur 1" }, 2: { nom: "Turquoise", sous: "Joueur 2" } };
+    return { 1: { nom: "Joueur X", sous: "Joueur 1" }, 2: { nom: "Joueur O", sous: "Joueur 2" } };
   }
   if (etat.mode === "ia") {
-    return { 1: { nom: "Toi", sous: "Violet" }, 2: { nom: "Ordinateur", sous: "Niveau " + NIVEAUX[etat.niveau] } };
+    return { 1: { nom: "Toi", sous: "Tu joues les X" }, 2: { nom: "Ordinateur", sous: "Niveau " + NIVEAUX[etat.niveau] } };
   }
   const moi = EnLigne.profil;
   const adv = etat.adversaire;
@@ -279,6 +295,18 @@ function infosJoueurs() {
   infos[etat.moi] = { nom: moi?.pseudo || "Toi", sous: `Toi · ${moi?.points ?? 1000} pts` };
   infos[3 - etat.moi] = { nom: adv?.pseudo || "Adversaire", sous: sousAdv, point: absent > 4 ? "hors" : "en-ligne" };
   return infos;
+}
+
+/** Petite icône X ou O (pour le bandeau et la fenêtre de fin). */
+function icoDe(joueur) {
+  return `<svg viewBox="0 0 100 100" aria-hidden="true"><use href="#ico-${joueur === 1 ? "x" : "o"}"/></svg>`;
+}
+
+/** Nombre de manches gagnées par le joueur 1 ou 2 depuis le début de la session. */
+function scoreDe(j) {
+  if (etat.mode !== "enligne") return etat.scores[j];
+  const id = j === 1 ? etat.partie?.joueur1 : etat.partie?.joueur2;
+  return etat.scoresJoueurs[id] || 0;
 }
 
 let dernierBandeau = "";
@@ -305,19 +333,30 @@ function majInterface() {
     carte.classList.toggle("chrono-visible", chrono);
     carte.classList.toggle("urgent", chrono && reste <= 5);
     carte.querySelector(".chrono .reste").style.strokeDashoffset = chrono ? PERIMETRE_CHRONO * (1 - reste / DUREE_COUP) : 0;
+    // Score (nombre de manches gagnées)
+    const score = scoreDe(j);
+    const badge = $("#score-j" + j);
+    if (badge.textContent !== String(score)) {
+      if (score > Number(badge.textContent)) {
+        badge.classList.remove("bump");
+        void badge.offsetWidth;
+        badge.classList.add("bump");
+      }
+      badge.textContent = score;
+    }
   }
 
   // --- Bandeau « À qui le tour » ---
-  let couleur = COULEURS[etat.tour];
+  let icone = icoDe(etat.tour);
   let texte = "";
   let anime = false;
   let temps = "";
   const nomAdv = etat.adversaire?.pseudo || "l'adversaire";
   if (etat.fini) {
     const g = etat.derniereFin?.gagnant;
-    if (!g) { texte = "Match nul"; couleur = "#A99FD0"; }
+    if (!g) { texte = "Match nul"; icone = icoDe(1) + icoDe(2); }
     else {
-      couleur = COULEURS[g];
+      icone = icoDe(g);
       if (etat.mode === "local") texte = `${NOMS[g]} a gagné !`;
       else if (resultatPourMoi(g) === "victoire") texte = "Tu as gagné !";
       else texte = etat.mode === "ia" ? "L'ordinateur a gagné" : `${nomAdv} a gagné`;
@@ -331,8 +370,7 @@ function majInterface() {
     texte = etat.tour === etat.moi ? "À toi de jouer" : `Au tour de ${nomAdv}`;
     if (enCours) temps = `<span class="temps${reste <= 5 ? " urgent" : ""}">${Math.ceil(reste)} s</span>`;
   }
-  if (etat.apercu >= 0 && !etat.fini) texte = "Touche encore pour poser";
-  const html = `<svg class="gemme" style="color:${couleur}"><use href="#gemme"/></svg><span${anime ? ' class="points-anim"' : ""}>${echapper(texte)}</span>${temps}`;
+  const html = `${icone}<span${anime ? ' class="points-anim"' : ""}>${echapper(texte)}</span>${temps}`;
   if (html !== dernierBandeau) {
     $("#bandeau").innerHTML = html;
     dernierBandeau = html;
@@ -360,6 +398,7 @@ function lancerPartieLocale(mode, niveau) {
   etat.mode = mode;
   if (niveau) etat.niveau = niveau;
   etat.premier = 1;
+  etat.scores = { 1: 0, 2: 0 }; // nouveau duel : les scores repartent de zéro
   nouvellePartie(false);
   afficherEcran("jeu");
 }
@@ -394,26 +433,16 @@ function clicCase(i) {
   }
   if (etat.mode === "ia" && etat.tour !== 1) return;
 
-  // Sur téléphone : 1re touche = aperçu, 2e touche sur la même case = on pose
-  if (TACTILE && etat.apercu !== i) {
-    definirApercu(i);
-    Sons.clic();
-    majInterface();
-    return;
-  }
-  definirApercu(-1);
-
   if (etat.mode === "enligne") jouerEnLigne(i);
   else jouerCoup(i);
 }
 
-/** Pose une gemme (parties hors ligne). */
+/** Pose un X ou un O (parties hors ligne). */
 function jouerCoup(i) {
   const joueur = etat.tour;
   etat.grille[i] = joueur;
   etat.historique.push(i);
   dessinerCase(i);
-  marquerDernier(i);
   Sons.poser(joueur);
   vibrer(10);
 
@@ -452,7 +481,6 @@ function annulerCoup() {
   }
   // Qui doit jouer ? Ça dépend du nombre de coups restants
   etat.tour = etat.historique.length % 2 === 0 ? etat.premier : 3 - etat.premier;
-  marquerDernier(etat.historique.length ? etat.historique[etat.historique.length - 1] : -1);
   Sons.clic();
   majInterface();
   if (etat.mode === "ia" && etat.tour === 2) tourIA();
@@ -481,7 +509,15 @@ function terminer(gagnant, gagnantes, infos = {}) {
   etat.verrou = false;
   etat.gagnantes = gagnantes;
   etat.derniereFin = { gagnant, infos };
-  definirApercu(-1);
+  // Une manche de plus pour le gagnant
+  if (gagnant) {
+    if (etat.mode === "enligne") {
+      const id = gagnant === 1 ? etat.partie?.joueur1 : etat.partie?.joueur2;
+      if (id) etat.scoresJoueurs[id] = (etat.scoresJoueurs[id] || 0) + 1;
+    } else {
+      etat.scores[gagnant]++;
+    }
+  }
   majInterface();
 
   const resultat = resultatPourMoi(gagnant);
@@ -492,7 +528,7 @@ function terminer(gagnant, gagnantes, infos = {}) {
   if (resultat === "victoire") {
     Sons.victoire();
     vibrer([40, 60, 40, 60, 120]);
-    setTimeout(() => Effets.pluie([COULEURS[gagnant], "#ffffff", COULEURS[3 - gagnant]]), gagnantes ? 800 : 100);
+    setTimeout(() => Effets.pluie([COULEURS[gagnant], COULEURS_2[gagnant], "#ffffff"], [gagnant === 1 ? "x" : "o"]), gagnantes ? 700 : 100);
   } else if (resultat === "defaite") {
     Sons.defaite();
     vibrer(220);
@@ -501,7 +537,7 @@ function terminer(gagnant, gagnantes, infos = {}) {
   }
 
   clearTimeout(etat.minuteurFin);
-  etat.minuteurFin = setTimeout(() => afficherFin(gagnant, infos), gagnantes ? 2300 : 700);
+  etat.minuteurFin = setTimeout(() => afficherFin(gagnant, infos), gagnantes ? 1600 : 700);
 }
 
 /** Remplit et ouvre la fenêtre de fin. */
@@ -515,26 +551,27 @@ function afficherFin(gagnant, infos = {}) {
 
   if (gagnant === 0) {
     titre = "Match nul";
-    texte = "La grille est pleine. Personne ne cède !";
+    texte = "Aucun alignement : égalité parfaite !";
   } else if (etat.mode === "local") {
     titre = `${NOMS[gagnant]} gagne !`;
-    texte = `5 gemmes alignées ${direction}.`;
+    texte = `3 symboles alignés ${direction}.`;
   } else if (etat.mode === "ia") {
     titre = gagnant === 1 ? "Victoire !" : "Défaite…";
     texte = gagnant === 1
       ? `Tu as battu l'ordinateur en niveau ${NIVEAUX[etat.niveau]} !`
-      : `L'ordinateur a aligné 5 gemmes ${direction}.`;
+      : `L'ordinateur a aligné 3 O ${direction}.`;
   } else {
     const gagne = resultat === "victoire";
     titre = gagne ? "Victoire !" : "Défaite…";
     if (infos.raison === "abandon") texte = gagne ? `${nomAdv} s'est déconnecté.` : "Tu as été absent trop longtemps.";
     else if (infos.raison === "forfait") texte = gagne ? `${nomAdv} a quitté la partie.` : "Tu as abandonné la partie.";
-    else texte = gagne ? `5 gemmes alignées ${direction} !` : `${nomAdv} a aligné 5 gemmes.`;
+    else texte = gagne ? `3 symboles alignés ${direction} !` : `${nomAdv} a aligné 3 symboles.`;
   }
 
   modal.classList.remove("victoire", "defaite", "nul");
   modal.classList.add(resultat);
-  modal.style.setProperty("--cf", gagnant ? COULEURS[gagnant] : "#A99FD0");
+  modal.style.setProperty("--cf", gagnant ? COULEURS_2[gagnant] : "#8B5CFF");
+  $("#fin-symbole").innerHTML = gagnant ? icoDe(gagnant) : icoDe(1) + icoDe(2);
   $("#fin-titre").textContent = titre;
   $("#fin-texte").textContent = texte;
 
@@ -715,10 +752,12 @@ async function lancerPartieEnLigne(p) {
     revancheAnnoncee: false,
     adversaire: null,
   });
+  // Nouvel adversaire → scores à zéro ; revanche → on garde les scores
+  if (!etat.revancheEnCours) etat.scoresJoueurs = {};
+  etat.revancheEnCours = false;
   reinitialiserPlateau();
   fermerFin();
   for (let i = 0; i < NB_CASES; i++) if (etat.grille[i]) dessinerCase(i, false);
-  if (p.dernier_coup != null) marquerDernier(p.dernier_coup);
   afficherEcran("jeu");
   majInterface();
   Sons.debut();
@@ -726,7 +765,7 @@ async function lancerPartieEnLigne(p) {
 
   etat.adversaire = await EnLigne.profilDe(etat.moi === 1 ? p.joueur2 : p.joueur1);
   majInterface();
-  toast(etat.tour === etat.moi ? "C'est toi qui commences ! (violet)" : `${etat.adversaire?.pseudo || "L'adversaire"} commence`, "info");
+  toast(etat.tour === etat.moi ? "C'est toi qui commences ! (tu joues les X)" : `${etat.adversaire?.pseudo || "L'adversaire"} commence (tu joues les O)`, "info");
 }
 
 /** Applique à l'écran le nouvel état reçu de la base. */
@@ -741,7 +780,6 @@ function appliquerEtatEnLigne(p, avant) {
       if (nouvelle[i] && nouvelle[i] !== etat.moi) coupAdverse = true;
     }
   }
-  if (p.dernier_coup != null && p.dernier_coup !== avant.dernier_coup) marquerDernier(p.dernier_coup);
   if (coupAdverse) {
     Sons.poser(3 - etat.moi);
     vibrer(15);
@@ -764,7 +802,7 @@ function appliquerEtatEnLigne(p, avant) {
   majInterface();
 }
 
-/** Je pose une gemme en ligne. */
+/** Je pose mon symbole en ligne. */
 async function jouerEnLigne(i) {
   const p = etat.partie;
   // On l'affiche tout de suite (plus fluide), la base confirmera
@@ -772,7 +810,6 @@ async function jouerEnLigne(i) {
   etat.coupEnAttente = i;
   etat.grille[i] = etat.moi;
   dessinerCase(i);
-  marquerDernier(i);
   Sons.poser(etat.moi);
   vibrer(10);
   majInterface();
@@ -782,7 +819,7 @@ async function jouerEnLigne(i) {
     etat.verrou = false;
     surMajPartie(r);
   } catch (err) {
-    // Refusé : on retire la gemme et on se resynchronise
+    // Refusé : on retire le symbole et on se resynchronise
     etat.coupEnAttente = -1;
     etat.verrou = false;
     etat.grille[i] = 0;
@@ -794,7 +831,6 @@ async function jouerEnLigne(i) {
       if (etat.partie) {
         etat.partie.version = -1;
         surMajPartie(frais);
-        marquerDernier(frais.dernier_coup ?? -1);
       }
     } catch { /* tant pis */ }
   }
@@ -881,6 +917,7 @@ async function ouvrirRevanche(id) {
   try {
     const nouvelle = await EnLigne.chargerPartie(id);
     suivrePartie(nouvelle);
+    etat.revancheEnCours = true;
     await lancerPartieEnLigne(nouvelle);
     toast("Revanche ! Les couleurs sont inversées.", "succes");
   } catch (err) {
@@ -976,14 +1013,14 @@ async function quitterPartie() {
    8. COMPTE, PROFIL ET CLASSEMENT
    ========================================================= */
 
-/** Les rangs portent des noms de pierres précieuses selon les points. */
+/** Les rangs portent des noms du ciel étoilé selon les points. */
 function rangDe(points) {
-  if (points >= 1700) return { nom: "Diamant", couleur: "#E8F6FF" };
-  if (points >= 1500) return { nom: "Rubis", couleur: "#FF7A9A" };
-  if (points >= 1300) return { nom: "Émeraude", couleur: "#5CF0A0" };
-  if (points >= 1100) return { nom: "Saphir", couleur: "#7FB2FF" };
-  if (points >= 900) return { nom: "Améthyste", couleur: "#C29BFF" };
-  return { nom: "Quartz", couleur: "#D9D2EE" };
+  if (points >= 1700) return { nom: "Supernova", couleur: "#FFD27A" };
+  if (points >= 1500) return { nom: "Galaxie", couleur: "#FF8FD1" };
+  if (points >= 1300) return { nom: "Nébuleuse", couleur: "#B98BFF" };
+  if (points >= 1100) return { nom: "Étoile", couleur: "#7DF9FF" };
+  if (points >= 900) return { nom: "Comète", couleur: "#8FB8FF" };
+  return { nom: "Étincelle", couleur: "#D9D2EE" };
 }
 
 /** Met à jour la pastille du compte en haut à droite. */
@@ -1087,7 +1124,7 @@ async function ouvrirClassement() {
   const maPosition = $("#ma-position");
   podium.innerHTML = "";
   maPosition.innerHTML = "";
-  liste.innerHTML = '<div class="chargement"><svg class="gemme loader-gemme"><use href="#gemme"/></svg></div>';
+  liste.innerHTML = '<div class="chargement"><svg class="ico"><use href="#ico-o"/></svg></div>';
 
   try {
     const top = await EnLigne.top10();
@@ -1106,7 +1143,7 @@ async function ouvrirClassement() {
       marche.className = "marche";
       if (j) {
         marche.style.setProperty("--mc", couleursPodium[rang]);
-        marche.innerHTML = `<svg class="gemme"><use href="#gemme"/></svg><span class="m-nom"></span><span class="m-pts">${j.points} pts</span><div class="socle">${rang + 1}</div>`;
+        marche.innerHTML = `<svg class="etoile"><use href="#i-etoile"/></svg><span class="m-nom"></span><span class="m-pts">${j.points} pts</span><div class="socle">${rang + 1}</div>`;
         marche.querySelector(".m-nom").textContent = j.pseudo + (j.id === monId ? " (toi)" : "");
       }
       podium.appendChild(marche);
@@ -1327,7 +1364,7 @@ $("#btn-installer").addEventListener("click", async () => {
 });
 window.addEventListener("appinstalled", () => {
   $("#btn-installer").hidden = true;
-  toast("Morpion 2.0 est installé ! 💎", "succes");
+  toast("Morpion 2.0 est installé ! ✨", "succes");
 });
 
 // Le service worker met les fichiers en cache pour jouer sans internet

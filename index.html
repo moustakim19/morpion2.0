@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <!-- viewport-fit=cover : le jeu utilise tout l'écran du téléphone (même sous l'encoche) -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1E1734">
-  <meta name="description" content="Morpion 2.0 : aligne 5 gemmes pour gagner. Duel local, contre l'ordinateur ou en ligne avec classement.">
+  <meta name="theme-color" content="#0A0918">
+  <meta name="description" content="Morpion 2.0 : le morpion réinventé. Duel local, contre l'ordinateur ou en ligne avec classement.">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Morpion 2.0">
@@ -31,28 +31,32 @@
        ===================================================== -->
   <svg class="sprite" width="0" height="0" aria-hidden="true">
     <defs>
-      <linearGradient id="gemme-reflet" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#fff" stop-opacity=".6"/>
-        <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+      <!-- Dégradés du logo : X rose → violet, O cyan → bleu -->
+      <linearGradient id="grad-x" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#FF8FD1"/>
+        <stop offset="1" stop-color="#8B5CFF"/>
+      </linearGradient>
+      <linearGradient id="grad-o" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#7DF9FF"/>
+        <stop offset="1" stop-color="#3B82F6"/>
+      </linearGradient>
+      <linearGradient id="grad-ligne-1" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#FF8FD1"/>
+        <stop offset="1" stop-color="#8B5CFF"/>
+      </linearGradient>
+      <linearGradient id="grad-ligne-2" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#7DF9FF"/>
+        <stop offset="1" stop-color="#3B82F6"/>
       </linearGradient>
 
-      <!-- LA GEMME TAILLÉE : sa couleur vient de la propriété CSS "color" -->
-      <symbol id="gemme" viewBox="0 0 100 100">
-        <polygon points="50,4 82.5,17.5 96,50 82.5,82.5 50,96 17.5,82.5 4,50 17.5,17.5" fill="currentColor"/>
-        <!-- 8 facettes, éclairées depuis le haut à gauche -->
-        <polygon points="50,4 82.5,17.5 64,36 50,30" fill="#fff" opacity=".28"/>
-        <polygon points="82.5,17.5 96,50 70,50 64,36" fill="#fff" opacity=".08"/>
-        <polygon points="96,50 82.5,82.5 64,64 70,50" fill="#000" opacity=".18"/>
-        <polygon points="82.5,82.5 50,96 50,70 64,64" fill="#000" opacity=".34"/>
-        <polygon points="50,96 17.5,82.5 36,64 50,70" fill="#000" opacity=".22"/>
-        <polygon points="17.5,82.5 4,50 30,50 36,64" fill="#000" opacity=".06"/>
-        <polygon points="4,50 17.5,17.5 36,36 30,50" fill="#fff" opacity=".3"/>
-        <polygon points="17.5,17.5 50,4 50,30 36,36" fill="#fff" opacity=".46"/>
-        <!-- La « table » (le dessus plat de la gemme) + reflet -->
-        <polygon points="50,30 64,36 70,50 64,64 50,70 36,64 30,50 36,36" fill="currentColor"/>
-        <polygon points="50,30 64,36 70,50 64,64 50,70 36,64 30,50 36,36" fill="url(#gemme-reflet)"/>
-        <polygon points="39,38 50,33 47,44 37,48" fill="#fff" opacity=".75"/>
-        <polygon points="50,4 82.5,17.5 96,50 82.5,82.5 50,96 17.5,82.5 4,50 17.5,17.5" fill="none" stroke="#fff" stroke-opacity=".4" stroke-width="1.6"/>
+      <!-- Petites icônes X et O (cartes, bandeau, boutons) -->
+      <symbol id="ico-x" viewBox="0 0 100 100">
+        <path d="M28 28 72 72M72 28 28 72" stroke="url(#grad-x)" stroke-width="15" stroke-linecap="round" fill="none"/>
+        <path d="M31 30 44 43" stroke="#fff" stroke-width="3.5" stroke-linecap="round" opacity=".6"/>
+      </symbol>
+      <symbol id="ico-o" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="23" stroke="url(#grad-o)" stroke-width="15" fill="none"/>
+        <path d="M33 41a19 19 0 0 1 12-10" stroke="#fff" stroke-width="3.5" stroke-linecap="round" fill="none" opacity=".6"/>
       </symbol>
 
       <!-- Icônes au trait -->
@@ -74,20 +78,21 @@
       <symbol id="i-maison" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V10z"/></g></symbol>
       <symbol id="i-epees" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="m13 19 6-6M16 16l4 4M19 21l2-2"/><path d="M14.5 6.5 18 3h3v3l-3.5 3.5"/><path d="m5 14 4 4M7 17l-3 3M3 19l2 2"/></g></symbol>
       <symbol id="i-sortie" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></g></symbol>
+      <symbol id="i-etoile" viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z" fill="currentColor"/></symbol>
     </defs>
   </svg>
 
-  <!-- Décor animé du fond (éclats d'obsidienne qui flottent) -->
-  <div class="fond" aria-hidden="true">
-    <span class="eclat" style="--x:6%;--y:12%;--t:120px;--c:#C29BFF;--d:14s"></span>
-    <span class="eclat" style="--x:82%;--y:8%;--t:80px;--c:#6CF5E6;--d:11s"></span>
-    <span class="eclat" style="--x:88%;--y:58%;--t:150px;--c:#C29BFF;--d:17s"></span>
-    <span class="eclat" style="--x:4%;--y:70%;--t:90px;--c:#6CF5E6;--d:13s"></span>
-    <span class="eclat" style="--x:48%;--y:90%;--t:70px;--c:#C29BFF;--d:10s"></span>
-    <span class="eclat" style="--x:60%;--y:30%;--t:40px;--c:#6CF5E6;--d:9s"></span>
+  <!-- Le ciel de nuit animé : aurores + étoiles -->
+  <div class="ciel" aria-hidden="true">
+    <div class="aurore aurore-1"></div>
+    <div class="aurore aurore-2"></div>
+    <div class="aurore aurore-3"></div>
+    <div class="etoiles etoiles-1"></div>
+    <div class="etoiles etoiles-2"></div>
+    <div class="etoiles etoiles-3"></div>
   </div>
 
-  <!-- Toile pour les explosions de gemmes -->
+  <!-- Toile pour les explosions de victoire -->
   <canvas id="fx" aria-hidden="true"></canvas>
 
   <!-- =====================================================
@@ -96,7 +101,7 @@
   <header class="barre">
     <button class="btn-icone" id="btn-retour" aria-label="Retour"><svg><use href="#i-retour"/></svg></button>
     <div class="marque-mini">
-      <img src="logo-morpion2.svg" alt="" width="28" height="28">
+      <img src="logo-morpion2.svg" alt="" width="30" height="30">
       <span>Morpion <b>2.0</b></span>
     </div>
     <div class="espace"></div>
@@ -116,18 +121,18 @@
           <img src="logo-morpion2.svg" alt="Logo Morpion 2.0" class="logo-hero">
         </div>
         <h1 class="titre">Morpion <span class="titre-2">2.0</span></h1>
-        <p class="slogan">Aligne <strong>5 gemmes</strong>. Fais trembler l'obsidienne.</p>
+        <p class="slogan">Aligne <strong>3 symboles</strong>. Allume l'aurore.</p>
       </div>
 
       <div class="modes">
         <p class="modes-label">Hors ligne</p>
         <button class="carte-mode" data-action="local">
-          <span class="carte-icone violet"><svg><use href="#i-duo"/></svg></span>
+          <span class="carte-icone rose"><svg><use href="#i-duo"/></svg></span>
           <span class="carte-texte"><strong>Duel local</strong><small>2 joueurs sur le même écran</small></span>
           <span class="carte-fleche">›</span>
         </button>
         <button class="carte-mode" data-action="ia">
-          <span class="carte-icone turquoise"><svg><use href="#i-robot"/></svg></span>
+          <span class="carte-icone cyan"><svg><use href="#i-robot"/></svg></span>
           <span class="carte-texte"><strong>Contre l'ordinateur</strong><small>3 niveaux · marche sans internet</small></span>
           <span class="carte-fleche">›</span>
         </button>
@@ -141,12 +146,12 @@
         </button>
         <div class="duo">
           <button class="carte-mode compacte en-ligne" data-action="creer">
-            <span class="carte-icone violet"><svg><use href="#i-plus"/></svg></span>
+            <span class="carte-icone rose"><svg><use href="#i-plus"/></svg></span>
             <span class="carte-texte"><strong>Créer une salle</strong><small>Invite un ami</small></span>
             <span class="badge-requis">Connexion requise</span>
           </button>
           <button class="carte-mode compacte en-ligne" data-action="rejoindre">
-            <span class="carte-icone turquoise"><svg><use href="#i-entrer"/></svg></span>
+            <span class="carte-icone cyan"><svg><use href="#i-entrer"/></svg></span>
             <span class="carte-texte"><strong>Rejoindre</strong><small>Avec un code</small></span>
             <span class="badge-requis">Connexion requise</span>
           </button>
@@ -162,27 +167,27 @@
           </button>
         </div>
       </div>
-      <p class="pied">Aligne 5 gemmes à l'horizontale, à la verticale ou en diagonale.</p>
+      <p class="pied">Aligne 3 symboles à l'horizontale, à la verticale ou en diagonale.</p>
     </section>
 
     <!-- ===================== CHOIX DU NIVEAU ===================== -->
     <section id="ecran-niveau" class="ecran">
       <h2 class="titre-ecran">Contre l'ordinateur</h2>
-      <p class="sous-titre">Choisis ton adversaire. Il joue même sans internet.</p>
+      <p class="sous-titre">Choisis ton adversaire. Tu joues les <b class="texte-x">X</b>, il joue les <b class="texte-o">O</b>.</p>
       <div class="niveaux">
-        <button class="carte-mode carte-niveau" data-niveau="facile" style="--accent:#6CF5E6">
-          <span class="gemmes-niveau"><svg class="gemme"><use href="#gemme"/></svg></span>
-          <span class="carte-texte"><strong>Facile</strong><small>Il joue un peu au hasard. Parfait pour apprendre.</small></span>
+        <button class="carte-mode carte-niveau" data-niveau="facile" style="--accent:#7DF9FF">
+          <span class="symboles-niveau"><svg><use href="#ico-o"/></svg></span>
+          <span class="carte-texte"><strong>Facile</strong><small>Il joue un peu au hasard. Parfait pour s'échauffer.</small></span>
           <span class="carte-fleche">›</span>
         </button>
-        <button class="carte-mode carte-niveau" data-niveau="moyen" style="--accent:#C29BFF">
-          <span class="gemmes-niveau"><svg class="gemme"><use href="#gemme"/></svg><svg class="gemme"><use href="#gemme"/></svg></span>
-          <span class="carte-texte"><strong>Moyen</strong><small>Il bloque tes alignements de 4 et construit les siens.</small></span>
+        <button class="carte-mode carte-niveau" data-niveau="moyen" style="--accent:#B98BFF">
+          <span class="symboles-niveau"><svg><use href="#ico-o"/></svg><svg><use href="#ico-o"/></svg></span>
+          <span class="carte-texte"><strong>Moyen</strong><small>Il bloque tes alignements, mais tombe dans les pièges.</small></span>
           <span class="carte-fleche">›</span>
         </button>
-        <button class="carte-mode carte-niveau" data-niveau="difficile" style="--accent:#FF8FB8">
-          <span class="gemmes-niveau"><svg class="gemme"><use href="#gemme"/></svg><svg class="gemme"><use href="#gemme"/></svg><svg class="gemme"><use href="#gemme"/></svg></span>
-          <span class="carte-texte"><strong>Difficile</strong><small>Il attaque et défend en évaluant chaque ligne.</small></span>
+        <button class="carte-mode carte-niveau" data-niveau="difficile" style="--accent:#FF8FD1">
+          <span class="symboles-niveau"><svg><use href="#ico-o"/></svg><svg><use href="#ico-o"/></svg><svg><use href="#ico-o"/></svg></span>
+          <span class="carte-texte"><strong>Difficile</strong><small>Il calcule tous les coups possibles. Imbattable ?</small></span>
           <span class="carte-fleche">›</span>
         </button>
       </div>
@@ -194,23 +199,25 @@
         <div class="carte-joueur" id="carte-j1" data-j="1">
           <div class="avatar">
             <svg class="chrono" viewBox="0 0 50 50"><circle class="piste" cx="25" cy="25" r="22"/><circle class="reste" cx="25" cy="25" r="22"/></svg>
-            <svg class="gemme"><use href="#gemme"/></svg>
+            <svg class="ico"><use href="#ico-x"/></svg>
           </div>
           <div class="infos">
-            <span class="nom">Violet</span>
+            <span class="nom">Joueur X</span>
             <span class="sous"><i class="point-ligne" hidden></i><span class="sous-texte">Joueur 1</span></span>
           </div>
+          <span class="score" id="score-j1">0</span>
         </div>
         <div class="vs">VS</div>
         <div class="carte-joueur" id="carte-j2" data-j="2">
           <div class="avatar">
             <svg class="chrono" viewBox="0 0 50 50"><circle class="piste" cx="25" cy="25" r="22"/><circle class="reste" cx="25" cy="25" r="22"/></svg>
-            <svg class="gemme"><use href="#gemme"/></svg>
+            <svg class="ico"><use href="#ico-o"/></svg>
           </div>
           <div class="infos">
-            <span class="nom">Turquoise</span>
+            <span class="nom">Joueur O</span>
             <span class="sous"><i class="point-ligne" hidden></i><span class="sous-texte">Joueur 2</span></span>
           </div>
+          <span class="score" id="score-j2">0</span>
         </div>
       </div>
 
@@ -218,7 +225,7 @@
 
       <div class="plateau-wrap">
         <div class="plateau" id="plateau"></div>
-        <svg class="ligne-victoire" id="ligne-victoire" aria-hidden="true"><line/></svg>
+        <svg class="ligne-victoire" id="ligne-victoire" aria-hidden="true"><line class="lueur"/><line class="coeur"/></svg>
       </div>
 
       <div class="actions-jeu">
@@ -267,7 +274,7 @@
           <button class="btn btn-ghost" id="btn-partager"><svg><use href="#i-partager"/></svg><span>Partager</span></button>
         </div>
         <div class="attente">
-          <svg class="gemme loader-gemme"><use href="#gemme"/></svg>
+          <svg class="ico chargeur"><use href="#ico-o"/></svg>
           <span class="points-anim">En attente de ton ami</span>
         </div>
         <button class="btn-lien" id="btn-annuler-salle">Annuler la salle</button>
@@ -292,7 +299,10 @@
         <div class="radar">
           <span class="onde"></span><span class="onde"></span><span class="onde"></span>
           <span class="balayage"></span>
-          <svg class="gemme radar-gemme"><use href="#gemme"/></svg>
+          <div class="orbite">
+            <svg class="ico"><use href="#ico-x"/></svg>
+            <svg class="ico"><use href="#ico-o"/></svg>
+          </div>
         </div>
         <h2 class="titre-ecran"><span class="points-anim">Recherche d'un adversaire</span></h2>
         <p class="sous-titre" id="temps-recherche">0:00</p>
@@ -312,9 +322,9 @@
     <!-- ===================== PROFIL ===================== -->
     <section id="ecran-profil" class="ecran">
       <div class="panneau panneau-etroit profil">
-        <div class="profil-avatar"><svg class="gemme"><use href="#gemme"/></svg></div>
+        <div class="profil-avatar"><span id="profil-initiale">?</span></div>
         <h2 id="profil-pseudo">—</h2>
-        <p class="profil-rang" id="profil-rang">Améthyste</p>
+        <p class="profil-rang" id="profil-rang">Comète</p>
         <div class="profil-points"><span id="profil-points">1000</span><small>points</small></div>
         <div class="stats">
           <div class="stat"><b id="profil-victoires">0</b><span>Victoires</span></div>
@@ -331,7 +341,7 @@
   <!-- ===================== FENÊTRE DE FIN DE PARTIE ===================== -->
   <div class="voile" id="voile-fin">
     <div class="modal modal-fin" role="dialog" aria-modal="true" aria-labelledby="fin-titre">
-      <div class="modal-gemme"><svg class="gemme" id="fin-gemme"><use href="#gemme"/></svg></div>
+      <div class="modal-symbole" id="fin-symbole"></div>
       <h2 id="fin-titre">Victoire !</h2>
       <p id="fin-texte"></p>
       <div class="fin-elo" id="fin-elo" hidden></div>

@@ -1,27 +1,30 @@
 /* =========================================================
-   jeu.js — Les règles du Morpion 2.0 (Gomoku 15 × 15)
+   jeu.js — Les règles du Morpion 2.0 (grille 3 × 3)
    ---------------------------------------------------------
    Ce fichier ne touche pas à l'écran : il contient seulement
    les règles. Comme ça, l'ordinateur (ia.js) et l'affichage
    (app.js) peuvent tous les deux s'en servir.
    ========================================================= */
 
-// La grille fait 15 cases de côté → 15 × 15 = 225 cases
-const TAILLE = 15;
+// La grille fait 3 cases de côté → 3 × 3 = 9 cases
+const TAILLE = 3;
 const NB_CASES = TAILLE * TAILLE;
 
-// Il faut aligner 5 gemmes pour gagner
-const ALIGNEMENT = 5;
+// Il faut aligner 3 symboles pour gagner
+const ALIGNEMENT = 3;
 
 /*
   Comment on range la grille ?
-  Au lieu d'un tableau à 2 dimensions, on utilise UNE liste de 225 cases :
-    case 0   = ligne 0, colonne 0 (en haut à gauche)
-    case 14  = ligne 0, colonne 14 (en haut à droite)
-    case 15  = ligne 1, colonne 0
-    ...
-  Formule : index = ligne × 15 + colonne
-  Chaque case vaut : 0 = vide, 1 = joueur 1 (violet), 2 = joueur 2 (turquoise)
+  Au lieu d'un tableau à 2 dimensions, on utilise UNE liste de 9 cases :
+
+      0 | 1 | 2
+     ---+---+---
+      3 | 4 | 5
+     ---+---+---
+      6 | 7 | 8
+
+  Formule : index = ligne × 3 + colonne
+  Chaque case vaut : 0 = vide, 1 = joueur X, 2 = joueur O
 */
 
 // Les 4 directions à tester. Chaque direction = [déplacement en ligne, déplacement en colonne]
@@ -33,7 +36,7 @@ const DIRECTIONS = [
   [1, -1],  // ↙ diagonale montante
 ];
 
-/** Crée une grille vide (225 zéros). */
+/** Crée une grille vide (9 zéros). */
 function creerGrille() {
   return new Array(NB_CASES).fill(0);
 }
@@ -43,12 +46,12 @@ function versIndex(ligne, colonne) {
   return ligne * TAILLE + colonne;
 }
 
-/** Retrouve la ligne d'une case. Exemple : case 37 → ligne 2 (car 37 ÷ 15 = 2,46). */
+/** Retrouve la ligne d'une case. Exemple : case 7 → ligne 2 (car 7 ÷ 3 = 2,33). */
 function ligneDe(index) {
   return Math.floor(index / TAILLE);
 }
 
-/** Retrouve la colonne d'une case. Exemple : case 37 → colonne 7 (reste de 37 ÷ 15). */
+/** Retrouve la colonne d'une case. Exemple : case 7 → colonne 1 (reste de 7 ÷ 3). */
 function colonneDe(index) {
   return index % TAILLE;
 }
@@ -59,25 +62,25 @@ function dansGrille(ligne, colonne) {
 }
 
 /**
- * L'ALGORITHME QUI DÉTECTE LES 5 GEMMES ALIGNÉES
+ * L'ALGORITHME QUI DÉTECTE LES 3 SYMBOLES ALIGNÉS
  * ------------------------------------------------
- * Idée clé : on n'a PAS besoin de vérifier toute la grille !
- * Une nouvelle ligne de 5 ne peut apparaître qu'en passant par
- * la gemme qu'on vient de poser. Donc on part de cette gemme et,
+ * Idée clé : une nouvelle ligne ne peut apparaître qu'en passant
+ * par le symbole qu'on vient de poser. Donc on part de cette case et,
  * pour chacune des 4 directions :
- *   1. on avance case par case tant qu'on trouve la même couleur,
- *   2. on recule case par case tant qu'on trouve la même couleur,
- *   3. on additionne : si on a au moins 5 gemmes → victoire !
+ *   1. on avance case par case tant qu'on trouve le même symbole,
+ *   2. on recule case par case tant qu'on trouve le même symbole,
+ *   3. on additionne : si on a au moins 3 → victoire !
  *
- * Exemple en horizontale, on vient de poser X au milieu :
- *        . O X X [X] X X . .
- *   reculer ← 2 gemmes     → avancer 2 gemmes
- *   total = 2 + 1 (celle posée) + 2 = 5 → gagné
+ * Exemple : on vient de poser X au milieu (case 4)
+ *     X | . | .        diagonale ↘ :
+ *     . |[X]| .          reculer → case 0 = X (1)
+ *     . | . | X          avancer → case 8 = X (1)
+ *                        total = 1 + 1 (posé) + 1 = 3 → gagné !
  *
- * Au maximum on regarde 4 directions × 2 sens × 4 cases = 32 cases,
- * au lieu de 225 : c'est très rapide.
+ * Cette méthode marche pour n'importe quelle taille de grille
+ * (il suffit de changer TAILLE et ALIGNEMENT en haut du fichier).
  *
- * @param {number[]} grille - la grille (225 cases)
+ * @param {number[]} grille - la grille (9 cases)
  * @param {number} index - la case où l'on vient de jouer
  * @returns {number[]|null} la liste des cases gagnantes (dans l'ordre), ou null
  */
@@ -89,10 +92,10 @@ function chercherVictoire(grille, index) {
   const c0 = colonneDe(index);
 
   for (const [dl, dc] of DIRECTIONS) {
-    // On démarre la ligne avec la gemme qu'on vient de poser
+    // On démarre la ligne avec le symbole qu'on vient de poser
     const ligne = [index];
 
-    // 1) On AVANCE dans la direction tant que c'est la même couleur
+    // 1) On AVANCE dans la direction tant que c'est le même symbole
     let l = l0 + dl;
     let c = c0 + dc;
     while (dansGrille(l, c) && grille[versIndex(l, c)] === joueur) {
@@ -101,7 +104,7 @@ function chercherVictoire(grille, index) {
       c += dc;
     }
 
-    // 2) On RECULE dans le sens opposé tant que c'est la même couleur
+    // 2) On RECULE dans le sens opposé tant que c'est le même symbole
     l = l0 - dl;
     c = c0 - dc;
     while (dansGrille(l, c) && grille[versIndex(l, c)] === joueur) {
@@ -110,11 +113,11 @@ function chercherVictoire(grille, index) {
       c -= dc;
     }
 
-    // 3) Au moins 5 à la suite ? C'est gagné !
+    // 3) Au moins 3 à la suite ? C'est gagné !
     if (ligne.length >= ALIGNEMENT) return ligne;
   }
 
-  return null; // aucune direction ne fait 5
+  return null; // aucune direction ne fait 3
 }
 
 /** Vrai si plus aucune case n'est vide (match nul). */
@@ -132,7 +135,7 @@ function nomDirection(cases) {
   return "en diagonale";
 }
 
-/** Convertit la grille texte de la base de données ("0012...") en liste de nombres. */
+/** Convertit la grille texte de la base de données ("001200000") en liste de nombres. */
 function grilleDepuisTexte(texte) {
   const grille = creerGrille();
   for (let i = 0; i < NB_CASES; i++) grille[i] = Number(texte[i]) || 0;
