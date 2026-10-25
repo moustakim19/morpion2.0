@@ -56,6 +56,8 @@ create index if not exists games_file_rapide on public.games (created_at)
 
 -- Passage à la grille 4 × 4 :
 -- les nouvelles parties ont 16 cases, et les anciennes parties pas finies sont annulées
+-- Salon de messages : les revanches partagent le salon de la 1re partie (vide = son propre id)
+alter table public.games add column if not exists salon uuid;
 alter table public.games alter column grille set default repeat('0', 16);
 update public.games set statut = 'annulee', version = version + 1
   where char_length(grille) <> 16 and statut in ('attente', 'en_cours');
@@ -403,8 +405,10 @@ begin
   if v_num = 1 then v_partie.revanche_j1 := true; else v_partie.revanche_j2 := true; end if;
 
   if v_partie.revanche_j1 and v_partie.revanche_j2 then
-    insert into games (joueur1, joueur2, statut, rapide, coup_at, vu_j1, vu_j2)
-    values (v_partie.joueur2, v_partie.joueur1, 'en_cours', v_partie.rapide, now(), now(), now())
+    -- La revanche garde le même salon de messages
+    insert into games (joueur1, joueur2, statut, rapide, coup_at, vu_j1, vu_j2, salon)
+    values (v_partie.joueur2, v_partie.joueur1, 'en_cours', v_partie.rapide, now(), now(), now(),
+            coalesce(v_partie.salon, v_partie.id))
     returning * into v_nouvelle;
     v_partie.revanche_id := v_nouvelle.id;
   end if;
@@ -460,5 +464,96 @@ begin
     where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'games'
   ) then
     alter publication supabase_realtime add table public.games;
+  end if;
+end $$;
+
+
+-- =====================================================================
+-- 9) SALON DE MESSAGES (texte + vocaux)
+-- =====================================================================
+-- Chaque partie a un « salon » : son propre id, ou celui de la 1re partie
+-- pour les revanches (on garde la conversation d'une manche à l'autre).
+create table if not exists public.messages (
+  id          bigint generated always as identity primary key,
+  salon       uuid not null,
+  auteur      uuid not null default auth.uid() references public.players(id) on delete cascade,
+  type        text not null default 'texte' check (type in ('texte', 'vocal')),
+  contenu     text check (char_length(contenu) between 1 and 300),  -- le texte (300 caractères max)
+  audio       text,                                                  -- chemin du fichier vocal
+  duree       real check (duree between 0 and 61),                   -- durée du vocal (secondes)
+  created_at  timestamptz not null default now(),
+  check ((type = 'texte' and contenu is not null) or (type = 'vocal' and audio is not null))
+);
+create index if not exists messages_salon_idx on public.messages (salon, created_at);
+
+-- Est-ce que je joue dans une partie de ce salon ?
+create or replace function public._dans_salon(p_salon uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from games
+    where coalesce(salon, id) = p_salon and auth.uid() in (joueur1, joueur2)
+  )
+$$;
+
+-- Pour les vocaux : le fichier est rangé dans un dossier qui porte le nom du salon
+create or replace function public._vocal_autorise(p_nom text)
+returns boolean language plpgsql stable security definer set search_path = public as $$
+begin
+  return public._dans_salon(split_part(p_nom, '/', 1)::uuid);
+exception when others then
+  return false;  -- nom de dossier invalide → refusé
+end $$;
+
+revoke all on function public._dans_salon(uuid)     from public, anon;
+revoke all on function public._vocal_autorise(text) from public, anon;
+grant execute on function public._dans_salon(uuid)     to authenticated;
+grant execute on function public._vocal_autorise(text) to authenticated;
+
+alter table public.messages enable row level security;
+
+-- Seuls les 2 joueurs du salon peuvent lire les messages…
+drop policy if exists "Les joueurs du salon lisent les messages" on public.messages;
+create policy "Les joueurs du salon lisent les messages"
+  on public.messages for select to authenticated
+  using (public._dans_salon(salon));
+
+-- … et en écrire (en leur propre nom seulement)
+drop policy if exists "Les joueurs du salon écrivent" on public.messages;
+create policy "Les joueurs du salon écrivent"
+  on public.messages for insert to authenticated
+  with check (auteur = auth.uid() and public._dans_salon(salon));
+
+-- Personne ne peut modifier ou effacer un message
+revoke all on public.messages from anon;
+revoke update, delete on public.messages from authenticated;
+grant select, insert on public.messages to authenticated;
+
+-- Le « placard » (bucket) privé où sont rangés les vocaux : 2 Mo maximum par fichier
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('vocaux', 'vocaux', false, 2097152,
+        array['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/aac', 'audio/wav'])
+on conflict (id) do update
+  set public = false,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "Vocaux : envoyer dans son salon" on storage.objects;
+create policy "Vocaux : envoyer dans son salon"
+  on storage.objects for insert to authenticated
+  with check (bucket_id = 'vocaux' and public._vocal_autorise(name));
+
+drop policy if exists "Vocaux : écouter ceux de son salon" on storage.objects;
+create policy "Vocaux : écouter ceux de son salon"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'vocaux' and public._vocal_autorise(name));
+
+-- Temps réel : les nouveaux messages arrivent instantanément
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'messages'
+  ) then
+    alter publication supabase_realtime add table public.messages;
   end if;
 end $$;

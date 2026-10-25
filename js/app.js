@@ -644,7 +644,10 @@ function suivrePartie(partie) {
   arreterSuivi();
   etat.partie = partie;
   etat.derniereMaj = Date.now();
-  EnLigne.abonner(partie.id, surMajPartie, surPresence);
+  // Le salon de messages : celui de la 1re partie (les revanches le partagent)
+  const salon = partie.salon || partie.id;
+  EnLigne.abonner(partie.id, salon, surMajPartie, surPresence, Chat.recevoir);
+  Chat.ouvrirSalon(salon);
   EnLigne.ping(partie.id);
   // Toutes les 10 s : « je suis toujours là »
   etat.intervalles.push(setInterval(() => {
@@ -675,6 +678,7 @@ function arreterSuivi() {
 /** Quitte proprement tout ce qui concerne le mode en ligne. */
 function quitterEnLigne() {
   if (EnLigne.pret) arreterSuivi();
+  Chat.fermerSalon();
   clearInterval(etat.tick);
   clearInterval(etat.minuteurRecherche);
   etat.tick = null;
@@ -765,6 +769,7 @@ async function lancerPartieEnLigne(p) {
 
   etat.adversaire = await EnLigne.profilDe(etat.moi === 1 ? p.joueur2 : p.joueur1);
   majInterface();
+  Chat.majEntete();
   toast(etat.tour === etat.moi ? "C'est toi qui commences ! (tu joues les X)" : `${etat.adversaire?.pseudo || "L'adversaire"} commence (tu joues les O)`, "info");
 }
 

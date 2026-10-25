@@ -141,7 +141,7 @@ const EnLigne = (() => {
      * - surMaj(partie) : appelée à chaque changement de la ligne dans la base
      * - surPresence(etat) : appelée quand quelqu'un arrive / part (indicateur « En ligne »)
      */
-    abonner(idPartie, surMaj, surPresence) {
+    abonner(idPartie, salon, surMaj, surPresence, surMessage) {
       api.desabonner();
       const canal = client.channel("partie-" + idPartie, {
         config: { presence: { key: api.user.id } },
@@ -149,6 +149,10 @@ const EnLigne = (() => {
       canal.on("postgres_changes",
         { event: "UPDATE", schema: "public", table: "games", filter: "id=eq." + idPartie },
         (message) => surMaj(message.new));
+      // Les nouveaux messages du salon (texte et vocaux)
+      canal.on("postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages", filter: "salon=eq." + salon },
+        (message) => surMessage(message.new));
       canal.on("presence", { event: "sync" }, () => surPresence(canal.presenceState()));
       canal.subscribe(async (statut) => {
         if (statut === "SUBSCRIBED") await canal.track({ en_ligne: true });
@@ -161,6 +165,44 @@ const EnLigne = (() => {
         client.removeChannel(api.canal);
         api.canal = null;
       }
+    },
+
+    /* ---------------- Salon de messages ---------------- */
+
+    /** Les 100 derniers messages du salon. */
+    async chargerMessages(salon) {
+      const { data, error } = await client.from("messages")
+        .select("*").eq("salon", salon)
+        .order("created_at", { ascending: false }).limit(100);
+      if (error) throw new Error(traduire(error));
+      return data.reverse(); // du plus ancien au plus récent
+    },
+
+    async envoyerTexte(salon, contenu) {
+      const { data, error } = await client.from("messages")
+        .insert({ salon, type: "texte", contenu }).select().single();
+      if (error) throw new Error(traduire(error));
+      return data;
+    },
+
+    /** Range le fichier audio dans le placard « vocaux », puis crée le message. */
+    async envoyerVocal(salon, fichier, duree) {
+      const type = (fichier.type || "audio/webm").split(";")[0];
+      const extension = { "audio/mp4": "m4a", "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/aac": "aac", "audio/wav": "wav" }[type] || "webm";
+      const chemin = `${salon}/${crypto.randomUUID()}.${extension}`;
+      const envoi = await client.storage.from("vocaux").upload(chemin, fichier, { contentType: type });
+      if (envoi.error) throw new Error(traduire(envoi.error));
+      const { data, error } = await client.from("messages")
+        .insert({ salon, type: "vocal", audio: chemin, duree: Math.round(duree * 10) / 10 }).select().single();
+      if (error) throw new Error(traduire(error));
+      return data;
+    },
+
+    /** Une adresse temporaire (1 heure) pour écouter un vocal privé. */
+    async urlVocal(chemin) {
+      const { data, error } = await client.storage.from("vocaux").createSignedUrl(chemin, 3600);
+      if (error) throw new Error(traduire(error));
+      return data.signedUrl;
     },
 
     /* ---------------- Classement ---------------- */
@@ -194,7 +236,8 @@ const EnLigne = (() => {
     if (/Database error saving new user/i.test(m)) return "Ce pseudo est déjà pris (ou invalide).";
     if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return "Connexion impossible. Vérifie ton internet.";
     if (/rate limit|too many/i.test(m)) return "Trop de tentatives, réessaie dans un moment.";
-    if (/Could not find the function|schema cache/i.test(m)) return "La base n'est pas prête : as-tu exécuté supabase.sql ?";
+    if (/Could not find the function|schema cache|Bucket not found/i.test(m)) return "La base n'est pas prête : as-tu exécuté supabase.sql ?";
+    if (/row-level security|violates row-level/i.test(m)) return "Action refusée par la sécurité de la base.";
     return m;
   }
 

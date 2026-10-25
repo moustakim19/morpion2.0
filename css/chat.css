@@ -1,0 +1,189 @@
+/* =========================================================
+   chat.css — Le salon de messages (texte + vocaux)
+   Utilise les couleurs définies dans style.css
+   ========================================================= */
+
+/* ---------- Bouton flottant en bas à droite ---------- */
+.btn-chat {
+  position: fixed; right: 18px; bottom: calc(18px + var(--bas-sur)); z-index: 65;
+  width: 60px; height: 60px; border-radius: 50%;
+  display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, #F27BCB, var(--x2) 55%, var(--o2));
+  box-shadow: 0 14px 34px -8px rgba(139, 92, 255, .85), inset 0 1px 0 rgba(255, 255, 255, .4);
+  transition: transform .25s cubic-bezier(.2, 1.4, .4, 1);
+  animation: chat-entree .5s cubic-bezier(.2, 1.4, .4, 1);
+}
+.btn-chat svg { width: 27px; height: 27px; }
+.btn-chat:hover { transform: scale(1.07); }
+.btn-chat:active { transform: scale(.94); }
+.btn-chat.secoue { animation: secouer .6s ease-in-out; }
+@keyframes chat-entree { from { transform: scale(0) rotate(-90deg); } }
+@keyframes secouer {
+  20% { transform: rotate(-14deg) scale(1.1); }
+  40% { transform: rotate(12deg) scale(1.1); }
+  60% { transform: rotate(-8deg); }
+  80% { transform: rotate(5deg); }
+}
+.badge-chat {
+  position: absolute; top: -3px; right: -3px;
+  min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px;
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 800; color: #fff;
+  background: var(--danger); border: 2px solid var(--nuit);
+  animation: pop .4s cubic-bezier(.2, 1.6, .4, 1);
+}
+/* Laisse de la place en bas pour que le bouton ne cache rien */
+body.chat-actif main { padding-bottom: calc(96px + var(--bas-sur)); }
+
+/* ---------- Le tiroir (monte depuis le bas sur téléphone) ---------- */
+.tiroir-chat {
+  position: fixed; inset: 0; z-index: 80;
+  pointer-events: none;
+  background: rgba(6, 5, 16, 0); transition: background .35s;
+}
+.tiroir-chat.ouvert { pointer-events: auto; background: rgba(6, 5, 16, .5); }
+.chat-panneau {
+  position: absolute; left: 50%; bottom: 0;
+  width: min(540px, 100%); height: min(80dvh, 680px);
+  display: flex; flex-direction: column;
+  border-radius: 28px 28px 0 0;
+  background: linear-gradient(180deg, rgba(40, 33, 86, .97), rgba(14, 12, 34, .98));
+  border: 1px solid var(--verre-bord); border-bottom: 0;
+  box-shadow: 0 -30px 80px -20px rgba(0, 0, 0, .8), inset 0 1px 0 rgba(255, 255, 255, .12);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  transform: translate(-50%, 105%);
+  transition: transform .45s cubic-bezier(.2, .9, .2, 1);
+  padding-bottom: var(--bas-sur);
+}
+.tiroir-chat.ouvert .chat-panneau { transform: translate(-50%, 0); }
+/* Petite poignée en haut */
+.chat-panneau::before {
+  content: ""; position: absolute; top: 8px; left: 50%;
+  width: 42px; height: 5px; margin-left: -21px; border-radius: 99px;
+  background: rgba(255, 255, 255, .2);
+}
+
+.chat-tete { display: flex; align-items: center; gap: 12px; padding: 22px 16px 12px; border-bottom: 1px solid rgba(255, 255, 255, .07); }
+.chat-icone {
+  flex: none; width: 42px; height: 42px; border-radius: 14px;
+  display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, #F27BCB, var(--x2) 55%, var(--o2));
+  box-shadow: 0 8px 20px -6px rgba(139, 92, 255, .8);
+}
+.chat-icone svg { width: 22px; height: 22px; }
+.chat-titres { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.chat-titres strong { font-size: 18px; font-weight: 800; }
+.chat-titres small { color: var(--doux); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- La liste des messages ---------- */
+.chat-liste {
+  flex: 1; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column;
+  padding: 12px 14px 8px;
+  scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .15) transparent;
+}
+.chat-vide { margin: auto; text-align: center; color: var(--doux); line-height: 1.6; }
+.msg { display: flex; flex-direction: column; max-width: 82%; margin-top: 10px; }
+.msg.suite { margin-top: 3px; }
+/* L'heure n'est affichée que sous le dernier message d'un groupe */
+.msg:has(+ .msg.suite) .meta { display: none; }
+.msg.moi { align-self: flex-end; align-items: flex-end; }
+.msg.lui { align-self: flex-start; align-items: flex-start; }
+.msg.nouveau { animation: bulle-entree .35s cubic-bezier(.2, 1.4, .4, 1); }
+@keyframes bulle-entree { from { opacity: 0; transform: translateY(10px) scale(.92); } }
+.bulle {
+  padding: 10px 14px; border-radius: 20px;
+  font-size: 15px; line-height: 1.38; word-break: break-word;
+  -webkit-user-select: text; user-select: text;
+}
+.moi .bulle {
+  color: #fff;
+  background: linear-gradient(135deg, #F27BCB, var(--x2) 65%, #6d5dff);
+  border-bottom-right-radius: 7px;
+  box-shadow: 0 8px 20px -10px rgba(139, 92, 255, .8);
+}
+.lui .bulle { background: rgba(255, 255, 255, .09); border: 1px solid rgba(125, 249, 255, .18); border-bottom-left-radius: 7px; }
+.moi.suite .bulle { border-top-right-radius: 7px; }
+.lui.suite .bulle { border-top-left-radius: 7px; }
+/* Un message avec seulement des émojis s'affiche en grand, sans bulle */
+.bulle.emoji { background: none; border: 0; box-shadow: none; padding: 0 2px; font-size: 42px; line-height: 1.1; }
+.meta { font-size: 11px; color: var(--doux); margin: 4px 6px 0; }
+
+/* ---------- Bulle de vocal ---------- */
+.bulle.vocal { display: flex; align-items: center; gap: 10px; min-width: 220px; padding: 8px 14px 8px 8px; }
+.lecture {
+  flex: none; width: 38px; height: 38px; border-radius: 50%;
+  display: grid; place-items: center;
+  transition: transform .2s;
+}
+.lecture:active { transform: scale(.9); }
+.lecture svg { width: 17px; height: 17px; }
+.moi .lecture { background: #fff; color: var(--x2); }
+.lui .lecture { color: #fff; background: linear-gradient(135deg, var(--o1), var(--o2)); }
+.bulle.charge .lecture { animation: tourner 1s linear infinite; opacity: .7; }
+.barres { flex: 1; height: 28px; display: flex; align-items: center; gap: 2px; }
+.barres i { flex: 1; min-width: 2px; border-radius: 2px; background: rgba(255, 255, 255, .38); transition: background .15s; }
+.barres i.lu { background: #fff; }
+.lui .barres i.lu { background: var(--o1); }
+.duree { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; opacity: .85; }
+
+/* ---------- Messages rapides ---------- */
+.chat-rapides { display: flex; gap: 8px; overflow-x: auto; padding: 8px 14px 2px; scrollbar-width: none; }
+.chat-rapides::-webkit-scrollbar { display: none; }
+.chat-rapides button {
+  flex: none; height: 34px; padding: 0 13px; border-radius: 999px;
+  font-size: 13.5px; font-weight: 600; white-space: nowrap;
+  background: var(--verre); border: 1px solid var(--verre-bord);
+  transition: background .2s, border-color .2s, transform .15s;
+}
+.chat-rapides button:hover { background: var(--verre-fort); border-color: rgba(255, 143, 209, .45); }
+.chat-rapides button:active { transform: scale(.94); }
+
+.chat-envoi { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 6px; font-size: 13px; color: var(--doux); }
+.chat-envoi .ico { width: 18px; height: 18px; }
+
+/* ---------- Zone d'écriture ---------- */
+.chat-saisie, .chat-enreg { display: flex; align-items: center; gap: 8px; padding: 10px 12px 14px; }
+.chat-saisie input {
+  flex: 1; min-width: 0; height: 48px; padding: 0 18px; border-radius: 999px; outline: none;
+  font-size: 16px; /* 16px évite le zoom automatique sur iPhone */
+  background: rgba(10, 9, 24, .6); border: 1px solid var(--verre-bord);
+  transition: border-color .2s, box-shadow .2s;
+}
+.chat-saisie input::placeholder { color: rgba(169, 164, 212, .55); }
+.chat-saisie input:focus { border-color: var(--x1); box-shadow: 0 0 0 4px rgba(255, 143, 209, .14); }
+.chat-rond {
+  flex: none; width: 48px; height: 48px; border-radius: 50%;
+  display: grid; place-items: center; color: #fff;
+  transition: transform .2s, filter .2s;
+}
+.chat-rond svg { width: 22px; height: 22px; }
+.chat-rond:active { transform: scale(.9); }
+.chat-envoyer { background: linear-gradient(135deg, #F27BCB, var(--x2) 55%, var(--o2)); box-shadow: 0 8px 20px -6px rgba(139, 92, 255, .8); }
+.chat-micro { background: linear-gradient(135deg, var(--o1), var(--o2)); box-shadow: 0 8px 20px -6px rgba(59, 130, 246, .8); }
+.chat-poubelle { background: rgba(255, 107, 142, .15); color: var(--danger); border: 1px solid rgba(255, 107, 142, .35); }
+
+/* ---------- Pendant l'enregistrement d'un vocal ---------- */
+.point-rec { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 12px var(--danger); animation: clignoter 1s steps(2) infinite; }
+.temps-rec { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 40px; }
+.onde-rec { flex: 1; height: 30px; display: flex; align-items: center; gap: 3px; }
+.onde-rec i { flex: 1; height: 30%; border-radius: 3px; background: linear-gradient(180deg, var(--x1), var(--o1)); animation: onde-voix 1s ease-in-out infinite alternate; }
+.onde-rec i:nth-child(3n) { animation-duration: .7s; }
+.onde-rec i:nth-child(3n+1) { animation-duration: 1.2s; animation-delay: -.3s; }
+.onde-rec i:nth-child(4n) { animation-duration: .85s; animation-delay: -.5s; }
+@keyframes onde-voix { to { height: 100%; } }
+
+/* ---------- Sur grand écran : le salon s'ouvre sur le côté droit ---------- */
+@media (min-width: 980px) {
+  .tiroir-chat.ouvert { background: transparent; pointer-events: none; }
+  .tiroir-chat.ouvert .chat-panneau { pointer-events: auto; }
+  .chat-panneau {
+    left: auto; right: 20px; bottom: 92px;
+    width: 390px; height: min(640px, calc(100dvh - 130px));
+    border-radius: 28px; border-bottom: 1px solid var(--verre-bord);
+    transform: translateX(120%); padding-bottom: 0;
+  }
+  .tiroir-chat.ouvert .chat-panneau { transform: none; }
+  .chat-panneau::before { display: none; }
+  .chat-tete { padding-top: 16px; }
+}

@@ -89,6 +89,11 @@ const Sons = (() => {
     debut() { cristal(659.25, 0, 0.15); cristal(987.8, 0.11, 0.15); },
     /** Adversaire trouvé ! */
     match() { [440, 554.4, 659.25, 880].forEach((f, i) => cristal(f, i * 0.07, 0.17)); },
+    /** Nouveau message dans le salon (petit « bloup » doux). */
+    message() {
+      note(740, 0, 0.12, { volume: 0.12, glisse: 1100 });
+      note(1100, 0.09, 0.18, { volume: 0.1 });
+    },
     /** Action interdite. */
     erreur() { note(180, 0, 0.16, { type: "sawtooth", volume: 0.05, glisse: 110 }); },
 
