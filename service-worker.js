@@ -10,7 +10,7 @@
    joueurs reçoivent les nouveaux fichiers.
    ========================================================= */
 
-const VERSION = "morpion-v1";
+const VERSION = "morpion-v2";
 
 // Les fichiers indispensables, mis en cache dès l'installation
 const FICHIERS = [
@@ -24,7 +24,7 @@ const FICHIERS = [
   "./js/effets.js",
   "./js/enligne.js",
   "./js/app.js",
-  "./logo-morpion.svg",
+  "./logo-morpion2.svg",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
