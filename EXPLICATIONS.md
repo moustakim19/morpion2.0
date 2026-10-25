@@ -6,7 +6,7 @@
 |---|---|
 | `index.html` | La structure de toutes les pages (accueil, partie, classement…) |
 | `css/style.css` | Tout le style « Aurore » : ciel de nuit, aurores, verre, néons |
-| `js/jeu.js` | Les **règles** : la grille 3 × 3 et la détection des 3 alignés |
+| `js/jeu.js` | Les **règles** : la grille 4 × 4 et la détection des 4 alignés |
 | `js/ia.js` | **L'ordinateur** (3 niveaux, sans internet) |
 | `js/sons.js` | Les sons, fabriqués avec la Web Audio API |
 | `js/effets.js` | L'explosion de mini X / O à la victoire (canvas) |
@@ -19,19 +19,21 @@
 
 ---
 
-## 1. L'algorithme qui détecte les 3 symboles alignés
+## 1. L'algorithme qui détecte les 4 symboles alignés
 
-La grille est **une liste de 9 cases**, numérotées ainsi :
+La grille est **une liste de 16 cases**, numérotées ainsi :
 
 ```
- 0 | 1 | 2
----+---+---
- 3 | 4 | 5
----+---+---
- 6 | 7 | 8
+  0 |  1 |  2 |  3
+----+----+----+----
+  4 |  5 |  6 |  7
+----+----+----+----
+  8 |  9 | 10 | 11
+----+----+----+----
+ 12 | 13 | 14 | 15
 ```
 
-La case `i` est à la ligne `i ÷ 3` et à la colonne `i % 3` (le reste de la division).
+La case `i` est à la ligne `i ÷ 4` et à la colonne `i % 4` (le reste de la division).
 
 **L'astuce :** une nouvelle ligne passe **forcément** par le symbole qu'on vient
 de poser. On part donc de cette case et, pour chacune des **4 directions**
@@ -39,13 +41,14 @@ de poser. On part donc de cette case et, pour chacune des **4 directions**
 
 1. on **avance** case par case tant que c'est le même symbole ;
 2. on **recule** dans le sens opposé tant que c'est le même symbole ;
-3. on additionne : **au moins 3 → victoire !**
+3. on additionne : **au moins 4 → victoire !**
 
 ```
-On vient de poser X au centre (case 4) :
-  X | . | .      diagonale ↘ : on recule → case 0 = X
-  . |[X]| .                    on avance → case 8 = X
-  . | . | X      total = 1 + 1 + 1 = 3 → gagné !
+On vient de poser X en case 5 :
+  X | . | . | .     diagonale ↘ : on recule → case 0 = X        (1)
+  . |[X]| . | .                   on avance → cases 10 et 15 = X (2)
+  . | . | X | .     total = 1 + 1 + 2 = 4 → gagné !
+  . | . | . | X
 ```
 
 On garde la liste des cases gagnantes pour les faire briller et tracer le trait.
@@ -57,17 +60,18 @@ vérifie les victoires en ligne, donc impossible de tricher.
 ## 2. Comment l'ordinateur choisit son coup
 
 - 🟢 **Facile** : il joue presque au hasard (il rate parfois une victoire ou un blocage).
-- 🟣 **Moyen** : il gagne s'il peut, **bloque tes alignements de 2**, aime le centre
-  et les coins… mais il ne voit pas les pièges à deux menaces (les « fourchettes »).
-- 🔴 **Difficile** : l'algorithme **minimax**. Comme il n'y a que 9 cases, il peut
-  imaginer **toutes** les suites possibles de la partie :
+- 🟣 **Moyen** : il gagne s'il peut, **bloque tes alignements de 3**, aime les 4 cases
+  du centre… sinon il joue au hasard.
+- 🔴 **Difficile** : l'algorithme **minimax**, 6 coups à l'avance :
   1. il essaie chaque case libre ;
-  2. il imagine que **tu** joues ton meilleur coup, puis lui le sien, etc. jusqu'à la fin ;
-  3. une fin où il gagne vaut **+10**, une fin où tu gagnes **−10**, un nul **0** ;
-  4. lui cherche le **max**imum, toi (dans sa tête) le **min**imum → « minimax ».
+  2. il imagine que **tu** joues ton meilleur coup, puis lui le sien, etc. ;
+  3. lui cherche le **max**imum, toi (dans sa tête) le **min**imum → « minimax » ;
+  4. au bout de 6 coups, il **note** la position : chaque ligne encore possible
+     rapporte 1 point avec 1 symbole, 10 avec 2, 100 avec 3 (en positif pour lui,
+     en négatif pour toi). Une victoire vaut 100 000.
 
-  Il préfère gagner vite et perdre le plus tard possible. Résultat : **il ne perd jamais**.
-  Au mieux, tu fais match nul ! (On a testé : 2 100 parties, 0 défaite.)
+  Sur 4 × 4, il y a trop de parties possibles pour toutes les imaginer jusqu'au bout :
+  c'est pour ça qu'il s'arrête à 6 coups. Dans nos tests, **il n'a jamais perdu**.
 
   L'**élagage alpha-bêta** est un raccourci : dès qu'une branche est forcément
   moins bonne qu'une autre déjà trouvée, il arrête de l'explorer. Même résultat,

@@ -157,7 +157,7 @@ function svgPion(joueur, anime) {
   </svg>`;
 }
 
-/** Crée les 9 cases (à chaque nouvelle partie, pour rejouer l'animation d'entrée). */
+/** Crée les 16 cases (à chaque nouvelle partie, pour rejouer l'animation d'entrée). */
 function construirePlateau() {
   plateau.innerHTML = "";
   cases = [];
@@ -172,7 +172,7 @@ function construirePlateau() {
   }
 }
 
-// Un seul écouteur pour tout le plateau (plus simple que 9 écouteurs)
+// Un seul écouteur pour tout le plateau (plus simple que 16 écouteurs)
 plateau.addEventListener("click", (e) => {
   const bouton = e.target.closest(".case");
   if (bouton) clicCase(Number(bouton.dataset.i));
@@ -554,18 +554,18 @@ function afficherFin(gagnant, infos = {}) {
     texte = "Aucun alignement : égalité parfaite !";
   } else if (etat.mode === "local") {
     titre = `${NOMS[gagnant]} gagne !`;
-    texte = `3 symboles alignés ${direction}.`;
+    texte = `4 symboles alignés ${direction}.`;
   } else if (etat.mode === "ia") {
     titre = gagnant === 1 ? "Victoire !" : "Défaite…";
     texte = gagnant === 1
       ? `Tu as battu l'ordinateur en niveau ${NIVEAUX[etat.niveau]} !`
-      : `L'ordinateur a aligné 3 O ${direction}.`;
+      : `L'ordinateur a aligné 4 O ${direction}.`;
   } else {
     const gagne = resultat === "victoire";
     titre = gagne ? "Victoire !" : "Défaite…";
     if (infos.raison === "abandon") texte = gagne ? `${nomAdv} s'est déconnecté.` : "Tu as été absent trop longtemps.";
     else if (infos.raison === "forfait") texte = gagne ? `${nomAdv} a quitté la partie.` : "Tu as abandonné la partie.";
-    else texte = gagne ? `3 symboles alignés ${direction} !` : `${nomAdv} a aligné 3 symboles.`;
+    else texte = gagne ? `4 symboles alignés ${direction} !` : `${nomAdv} a aligné 4 symboles.`;
   }
 
   modal.classList.remove("victoire", "defaite", "nul");

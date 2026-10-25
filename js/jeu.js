@@ -1,29 +1,31 @@
 /* =========================================================
-   jeu.js — Les règles du Morpion 2.0 (grille 3 × 3)
+   jeu.js — Les règles du Morpion 2.0 (grille 4 × 4)
    ---------------------------------------------------------
    Ce fichier ne touche pas à l'écran : il contient seulement
    les règles. Comme ça, l'ordinateur (ia.js) et l'affichage
    (app.js) peuvent tous les deux s'en servir.
    ========================================================= */
 
-// La grille fait 3 cases de côté → 3 × 3 = 9 cases
-const TAILLE = 3;
+// La grille fait 4 cases de côté → 4 × 4 = 16 cases
+const TAILLE = 4;
 const NB_CASES = TAILLE * TAILLE;
 
-// Il faut aligner 3 symboles pour gagner
-const ALIGNEMENT = 3;
+// Il faut aligner 4 symboles (une ligne complète) pour gagner
+const ALIGNEMENT = 4;
 
 /*
   Comment on range la grille ?
-  Au lieu d'un tableau à 2 dimensions, on utilise UNE liste de 9 cases :
+  Au lieu d'un tableau à 2 dimensions, on utilise UNE liste de 16 cases :
 
-      0 | 1 | 2
-     ---+---+---
-      3 | 4 | 5
-     ---+---+---
-      6 | 7 | 8
+       0 |  1 |  2 |  3
+     ----+----+----+----
+       4 |  5 |  6 |  7
+     ----+----+----+----
+       8 |  9 | 10 | 11
+     ----+----+----+----
+      12 | 13 | 14 | 15
 
-  Formule : index = ligne × 3 + colonne
+  Formule : index = ligne × 4 + colonne
   Chaque case vaut : 0 = vide, 1 = joueur X, 2 = joueur O
 */
 
@@ -36,7 +38,7 @@ const DIRECTIONS = [
   [1, -1],  // ↙ diagonale montante
 ];
 
-/** Crée une grille vide (9 zéros). */
+/** Crée une grille vide (16 zéros). */
 function creerGrille() {
   return new Array(NB_CASES).fill(0);
 }
@@ -46,12 +48,12 @@ function versIndex(ligne, colonne) {
   return ligne * TAILLE + colonne;
 }
 
-/** Retrouve la ligne d'une case. Exemple : case 7 → ligne 2 (car 7 ÷ 3 = 2,33). */
+/** Retrouve la ligne d'une case. Exemple : case 9 → ligne 2 (car 9 ÷ 4 = 2,25). */
 function ligneDe(index) {
   return Math.floor(index / TAILLE);
 }
 
-/** Retrouve la colonne d'une case. Exemple : case 7 → colonne 1 (reste de 7 ÷ 3). */
+/** Retrouve la colonne d'une case. Exemple : case 9 → colonne 1 (reste de 9 ÷ 4). */
 function colonneDe(index) {
   return index % TAILLE;
 }
@@ -62,25 +64,25 @@ function dansGrille(ligne, colonne) {
 }
 
 /**
- * L'ALGORITHME QUI DÉTECTE LES 3 SYMBOLES ALIGNÉS
+ * L'ALGORITHME QUI DÉTECTE LES 4 SYMBOLES ALIGNÉS
  * ------------------------------------------------
  * Idée clé : une nouvelle ligne ne peut apparaître qu'en passant
  * par le symbole qu'on vient de poser. Donc on part de cette case et,
  * pour chacune des 4 directions :
  *   1. on avance case par case tant qu'on trouve le même symbole,
  *   2. on recule case par case tant qu'on trouve le même symbole,
- *   3. on additionne : si on a au moins 3 → victoire !
+ *   3. on additionne : si on a au moins 4 → victoire !
  *
- * Exemple : on vient de poser X au milieu (case 4)
- *     X | . | .        diagonale ↘ :
- *     . |[X]| .          reculer → case 0 = X (1)
- *     . | . | X          avancer → case 8 = X (1)
- *                        total = 1 + 1 (posé) + 1 = 3 → gagné !
+ * Exemple : on vient de poser X en case 5
+ *     X | . | . | .      diagonale ↘ :
+ *     . |[X]| . | .        reculer → case 0 = X (1)
+ *     . | . | X | .        avancer → cases 10 et 15 = X (2)
+ *     . | . | . | X        total = 1 + 1 (posé) + 2 = 4 → gagné !
  *
  * Cette méthode marche pour n'importe quelle taille de grille
  * (il suffit de changer TAILLE et ALIGNEMENT en haut du fichier).
  *
- * @param {number[]} grille - la grille (9 cases)
+ * @param {number[]} grille - la grille (16 cases)
  * @param {number} index - la case où l'on vient de jouer
  * @returns {number[]|null} la liste des cases gagnantes (dans l'ordre), ou null
  */
@@ -113,11 +115,11 @@ function chercherVictoire(grille, index) {
       c -= dc;
     }
 
-    // 3) Au moins 3 à la suite ? C'est gagné !
+    // 3) Au moins 4 à la suite ? C'est gagné !
     if (ligne.length >= ALIGNEMENT) return ligne;
   }
 
-  return null; // aucune direction ne fait 3
+  return null; // aucune direction ne fait 4
 }
 
 /** Vrai si plus aucune case n'est vide (match nul). */
@@ -135,7 +137,7 @@ function nomDirection(cases) {
   return "en diagonale";
 }
 
-/** Convertit la grille texte de la base de données ("001200000") en liste de nombres. */
+/** Convertit la grille texte de la base de données ("0012000000000000") en liste de nombres. */
 function grilleDepuisTexte(texte) {
   const grille = creerGrille();
   for (let i = 0; i < NB_CASES; i++) grille[i] = Number(texte[i]) || 0;

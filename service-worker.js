@@ -10,7 +10,7 @@
    joueurs reçoivent les nouveaux fichiers.
    ========================================================= */
 
-const VERSION = "morpion-v3";
+const VERSION = "morpion-v4";
 
 // Les fichiers indispensables, mis en cache dès l'installation
 const FICHIERS = [

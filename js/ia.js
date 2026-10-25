@@ -1,34 +1,54 @@
 /* =========================================================
    ia.js — L'ordinateur (marche sans internet)
    ---------------------------------------------------------
-   Sur une grille 3 × 3, il n'y a que 9 cases : l'ordinateur
-   peut donc imaginer TOUTES les suites possibles de la partie.
-   C'est l'algorithme MINIMAX :
+   L'ordinateur utilise l'algorithme MINIMAX :
 
    - Il essaie chaque case libre.
    - Pour chacune, il imagine que TU joues ton meilleur coup,
-     puis lui son meilleur coup, puis toi… jusqu'à la fin.
-   - Une fin où il gagne vaut +10, une fin où tu gagnes vaut -10,
-     un match nul vaut 0.
-   - Lui cherche le MAXimum, toi (dans sa tête) le MINimum :
+     puis lui son meilleur coup, puis toi… plusieurs coups à l'avance.
+   - Lui cherche la note MAXimum, toi (dans sa tête) la note MINimum :
      d'où le nom « minimax ».
 
-   On retire un peu de points selon la profondeur : il préfère
-   gagner VITE et perdre le plus TARD possible.
+   Sur une grille 4 × 4, il y a trop de parties possibles pour toutes
+   les imaginer jusqu'au bout. Alors il regarde seulement quelques
+   coups à l'avance, puis il NOTE la position avec une évaluation :
+   une ligne où il n'y a que ses symboles est bonne pour lui
+   (et encore meilleure s'il y en a beaucoup), une ligne où il n'y a
+   que les tiens est dangereuse.
    ========================================================= */
 
 const IA = (() => {
-  // Les 8 lignes gagnantes possibles (3 lignes, 3 colonnes, 2 diagonales)
-  const LIGNES = [
-    [0, 1, 2], [3, 4, 5], [6, 7, 8],
-    [0, 3, 6], [1, 4, 7], [2, 5, 8],
-    [0, 4, 8], [2, 4, 6],
-  ];
+  // Toutes les lignes gagnantes possibles, calculées automatiquement :
+  // en 4 × 4 → 4 lignes + 4 colonnes + 2 diagonales = 10 lignes
+  const LIGNES = [];
+  for (let i = 0; i < NB_CASES; i++) {
+    for (const [dl, dc] of DIRECTIONS) {
+      const ligne = [];
+      for (let k = 0; k < ALIGNEMENT; k++) {
+        const l = ligneDe(i) + dl * k;
+        const c = colonneDe(i) + dc * k;
+        if (!dansGrille(l, c)) break;
+        ligne.push(versIndex(l, c));
+      }
+      if (ligne.length === ALIGNEMENT) LIGNES.push(ligne);
+    }
+  }
+
+  // Les cases du centre (les plus utiles : elles touchent le plus de lignes)
+  const CENTRE = [];
+  for (let i = 0; i < NB_CASES; i++) {
+    const l = ligneDe(i);
+    const c = colonneDe(i);
+    if (l > 0 && l < TAILLE - 1 && c > 0 && c < TAILLE - 1) CENTRE.push(i);
+  }
+
+  const VICTOIRE = 100000;
 
   /** Qui a gagné dans cette grille ? 0 = personne pour l'instant. */
   function vainqueur(grille) {
-    for (const [a, b, c] of LIGNES) {
-      if (grille[a] && grille[a] === grille[b] && grille[a] === grille[c]) return grille[a];
+    for (const ligne of LIGNES) {
+      const v = grille[ligne[0]];
+      if (v && ligne.every((i) => grille[i] === v)) return v;
     }
     return 0;
   }
@@ -46,38 +66,56 @@ const IA = (() => {
   }
 
   /**
-   * Note une position avec minimax + « élagage alpha-bêta ».
+   * Évaluation d'une position (sans regarder plus loin) :
+   * chaque ligne « encore possible » rapporte des points.
+   * 1 symbole = 1, 2 symboles = 10, 3 symboles = 100.
+   */
+  function evaluer(grille, moi) {
+    let note = 0;
+    for (const ligne of LIGNES) {
+      let miens = 0;
+      let siens = 0;
+      for (const i of ligne) {
+        if (grille[i] === moi) miens++;
+        else if (grille[i] !== 0) siens++;
+      }
+      if (miens && !siens) note += 10 ** (miens - 1);
+      else if (siens && !miens) note -= 10 ** (siens - 1);
+    }
+    return note;
+  }
+
+  /**
+   * Minimax avec « élagage alpha-bêta » et profondeur limitée.
    * Alpha-bêta = un raccourci : dès qu'on sait qu'une branche est moins
    * bonne qu'une autre déjà trouvée, on arrête de l'explorer.
-   * Le résultat est exactement le même, mais des centaines de fois plus rapide.
    * @param {number} joueur - qui doit jouer maintenant
    * @param {number} moi - le numéro de l'ordinateur
-   * @param {number} profondeur - combien de coups on a imaginé
-   * @param {number} alpha - la meilleure note déjà garantie pour l'ordinateur
-   * @param {number} beta - la meilleure note déjà garantie pour l'adversaire
+   * @param {number} profondeur - combien de coups il reste à imaginer
    */
   function minimax(grille, joueur, moi, profondeur, alpha, beta) {
     const g = vainqueur(grille);
-    if (g === moi) return 10 - profondeur;   // il gagne (mieux si c'est rapide)
-    if (g !== 0) return profondeur - 10;      // il perd (moins grave si c'est tard)
+    if (g === moi) return VICTOIRE + profondeur;    // il gagne (mieux si c'est rapide)
+    if (g !== 0) return -VICTOIRE - profondeur;     // il perd (moins grave si c'est tard)
     const libres = casesLibres(grille);
-    if (!libres.length) return 0;             // match nul
+    if (!libres.length) return 0;                   // match nul
+    if (profondeur === 0) return evaluer(grille, moi); // on s'arrête et on note
 
     if (joueur === moi) {
       let meilleur = -Infinity;
       for (const i of libres) {
-        grille[i] = joueur;                    // on essaie…
-        meilleur = Math.max(meilleur, minimax(grille, 3 - joueur, moi, profondeur + 1, alpha, beta));
-        grille[i] = 0;                         // … puis on annule
+        grille[i] = joueur;                         // on essaie…
+        meilleur = Math.max(meilleur, minimax(grille, 3 - joueur, moi, profondeur - 1, alpha, beta));
+        grille[i] = 0;                              // … puis on annule
         alpha = Math.max(alpha, meilleur);
-        if (alpha >= beta) break;              // inutile de chercher plus loin
+        if (alpha >= beta) break;                   // inutile de chercher plus loin
       }
       return meilleur;
     }
     let pire = Infinity;
     for (const i of libres) {
       grille[i] = joueur;
-      pire = Math.min(pire, minimax(grille, 3 - joueur, moi, profondeur + 1, alpha, beta));
+      pire = Math.min(pire, minimax(grille, 3 - joueur, moi, profondeur - 1, alpha, beta));
       grille[i] = 0;
       beta = Math.min(beta, pire);
       if (alpha >= beta) break;
@@ -89,7 +127,7 @@ const IA = (() => {
   function coupGagnant(grille, joueur) {
     for (const i of casesLibres(grille)) {
       grille[i] = joueur;
-      const gagne = chercherVictoire(grille, i);
+      const gagne = vainqueur(grille) === joueur;
       grille[i] = 0;
       if (gagne) return i;
     }
@@ -112,29 +150,32 @@ const IA = (() => {
     // ---------- FACILE : presque au hasard ----------
     if (niveau === "facile") {
       if (gagne >= 0 && Math.random() < 0.5) return gagne;
-      if (bloque >= 0 && Math.random() < 0.3) return bloque;
+      if (bloque >= 0 && Math.random() < 0.4) return bloque;
       return auHasard(libres);
     }
 
-    // ---------- MOYEN : gagne, bloque, sinon joue « bien » sans tout calculer ----------
+    // ---------- MOYEN : gagne, bloque, sinon joue au centre ou au hasard ----------
     if (niveau === "moyen") {
       if (gagne >= 0) return gagne;
-      if (bloque >= 0) return bloque;              // il bloque tes alignements
-      if (grille[4] === 0 && Math.random() < 0.7) return 4; // le centre est la meilleure case
-      const coins = [0, 2, 6, 8].filter((i) => grille[i] === 0);
-      if (coins.length && Math.random() < 0.6) return auHasard(coins);
-      return auHasard(libres);                     // … mais il ne voit pas les pièges
+      if (bloque >= 0) return bloque;               // tu as 3 symboles alignés : il bouche
+      const centre = CENTRE.filter((i) => grille[i] === 0);
+      if (centre.length && Math.random() < 0.6) return auHasard(centre);
+      return auHasard(libres);
     }
 
-    // ---------- DIFFICILE : minimax, il ne perd jamais ----------
-    // Grille vide : inutile de calculer, le centre ou un coin sont les meilleurs coups
-    if (libres.length === NB_CASES) return auHasard([0, 2, 4, 4, 6, 8]);
+    // ---------- DIFFICILE : minimax, 6 coups à l'avance ----------
+    if (gagne >= 0) return gagne;
+    if (bloque >= 0) return bloque;
+    if (libres.length >= NB_CASES - 1) {
+      // Début de partie : le centre est toujours le meilleur choix
+      const centre = CENTRE.filter((i) => grille[i] === 0);
+      return auHasard(centre);
+    }
     let meilleureNote = -Infinity;
     let meilleurs = [];
     for (const i of libres) {
       grille[i] = moi;
-      // Fenêtre (note - 1, +∞) : on garde les égalités pour pouvoir varier les coups
-      const note = minimax(grille, adversaire, moi, 1, meilleureNote - 1, Infinity);
+      const note = minimax(grille, adversaire, moi, 5, meilleureNote - 1, Infinity);
       grille[i] = 0;
       if (note > meilleureNote) { meilleureNote = note; meilleurs = [i]; }
       else if (note === meilleureNote) meilleurs.push(i);
