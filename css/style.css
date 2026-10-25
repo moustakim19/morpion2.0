@@ -730,3 +730,6 @@ main { position: relative; max-width: 680px; margin: 0 auto; padding: 0 16px cal
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Numéro de version en bas de l accueil */
+.version { display: inline-block; margin-top: 8px; font-size: 11.5px; letter-spacing: .08em; opacity: .7; }

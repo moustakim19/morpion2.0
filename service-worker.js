@@ -10,7 +10,7 @@
    joueurs reçoivent les nouveaux fichiers.
    ========================================================= */
 
-const VERSION = "morpion-v5";
+const VERSION = "morpion-v6";
 
 // Les fichiers indispensables, mis en cache dès l'installation
 const FICHIERS = [
@@ -35,9 +35,12 @@ const FICHIERS = [
   "./icons/apple-touch-icon.png",
 ];
 
-// 1) Installation : on remplit la réserve
+// 1) Installation : on remplit la réserve (en forçant le téléchargement des fichiers frais)
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(FICHIERS)));
+  event.waitUntil(
+    caches.open(VERSION).then((cache) =>
+      cache.addAll(FICHIERS.map((f) => new Request(f, { cache: "reload" }))))
+  );
   self.skipWaiting(); // la nouvelle version prend la main tout de suite
 });
 
@@ -50,39 +53,53 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+/** Range une copie de la réponse dans la réserve. */
+async function ranger(requete, reponse) {
+  if (reponse && (reponse.ok || reponse.type === "opaque")) {
+    const cache = await caches.open(VERSION);
+    await cache.put(requete, reponse.clone());
+  }
+  return reponse;
+}
+
+/**
+ * « Internet d'abord » : on télécharge la version la plus récente.
+ * Si internet ne répond pas (hors ligne, ou plus de 4 secondes), on prend la réserve.
+ */
+async function internetDabord(requete) {
+  const delai = new Promise((resoudre) => setTimeout(resoudre, 4000, null));
+  try {
+    const reponse = await Promise.race([fetch(requete).then((r) => ranger(requete, r)), delai]);
+    if (reponse) return reponse;
+  } catch { /* hors ligne */ }
+  const enReserve = await caches.match(requete, { ignoreSearch: true });
+  if (enReserve) return enReserve;
+  if (requete.mode === "navigate") return caches.match("./index.html");
+  return new Response("", { status: 504, statusText: "Hors ligne" });
+}
+
+/** « Réserve d'abord » (polices, icônes, bibliothèque Supabase) : rapide, et mis à jour en arrière-plan. */
+async function reserveDabord(requete, event) {
+  const depuisInternet = fetch(requete).then((r) => ranger(requete, r)).catch(() => null);
+  event.waitUntil(depuisInternet);
+  const enReserve = await caches.match(requete);
+  return enReserve || (await depuisInternet) || new Response("", { status: 504, statusText: "Hors ligne" });
+}
+
 // 3) Chaque fois que le jeu demande un fichier
 self.addEventListener("fetch", (event) => {
   const requete = event.request;
   if (requete.method !== "GET") return;
   const url = new URL(requete.url);
 
-  // Supabase (comptes, parties, classement) : toujours en direct, jamais en cache
+  // Supabase (comptes, parties, messages, vocaux) : toujours en direct, jamais en cache
   if (url.hostname.endsWith("supabase.co") || url.hostname.endsWith("supabase.in")) return;
   if (!url.protocol.startsWith("http")) return;
 
-  // Stratégie « réserve d'abord, puis mise à jour en arrière-plan » :
-  // on répond tout de suite avec la réserve (rapide, marche hors ligne)
-  // et on télécharge la nouvelle version pour la prochaine fois.
-  const depuisInternet = fetch(requete)
-    .then(async (reponse) => {
-      if (reponse && (reponse.ok || reponse.type === "opaque")) {
-        const copie = reponse.clone();
-        const cache = await caches.open(VERSION);
-        await cache.put(requete, copie);
-      }
-      return reponse;
-    })
-    .catch(() => null);
-
-  event.waitUntil(depuisInternet);
-  event.respondWith(
-    caches.match(requete, { ignoreSearch: url.origin === location.origin }).then(async (enReserve) => {
-      if (enReserve) return enReserve;
-      const reponse = await depuisInternet;
-      if (reponse) return reponse;
-      // Hors ligne et page inconnue : on renvoie l'accueil
-      if (requete.mode === "navigate") return caches.match("./index.html");
-      return new Response("", { status: 504, statusText: "Hors ligne" });
-    })
-  );
+  // Les fichiers du jeu (pages, scripts, styles) : toujours la dernière version
+  if (url.origin === location.origin && !url.pathname.includes("/icons/")) {
+    event.respondWith(internetDabord(requete));
+  } else {
+    event.respondWith(reserveDabord(requete, event));
+  }
 });

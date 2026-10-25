@@ -11,6 +11,8 @@ const $ = (selecteur) => document.querySelector(selecteur);
 const $$ = (selecteur) => document.querySelectorAll(selecteur);
 
 /* ---------- Constantes ---------- */
+// Numéro de version affiché en bas de l'accueil (à changer avec VERSION dans service-worker.js)
+const VERSION_JEU = "6";
 const DUREE_COUP = 30;       // secondes pour jouer un coup en ligne
 const DELAI_ABANDON = 60;    // secondes d'absence avant de perdre par abandon
 // Joueur 1 = X (rose → violet), joueur 2 = O (cyan → bleu), comme le logo
@@ -1375,7 +1377,31 @@ window.addEventListener("appinstalled", () => {
 // Le service worker met les fichiers en cache pour jouer sans internet
 // (il ne marche qu'avec une adresse http(s), pas en ouvrant le fichier directement)
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-  navigator.serviceWorker.register("service-worker.js").catch(() => {});
+  // Y avait-il déjà une version installée ? (sinon, c'est la toute 1re visite)
+  const dejaInstalle = Boolean(navigator.serviceWorker.controller);
+  // updateViaCache "none" : le navigateur vérifie toujours la dernière version du service worker
+  navigator.serviceWorker.register("service-worker.js", { updateViaCache: "none" })
+    .then((inscription) => {
+      // On vérifie s'il y a une mise à jour quand on revient sur l'appli
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) inscription.update().catch(() => {});
+      });
+    })
+    .catch(() => {});
+  // Une nouvelle version vient de prendre la main → on recharge pour l'afficher
+  let rechargee = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!dejaInstalle || rechargee) return;
+    // On ne recharge pas au milieu d'une partie en ligne
+    if (etat.partie && etat.partie.statut === "en_cours") return;
+    rechargee = true;
+    sessionStorage.setItem("morpion-maj", "1");
+    location.reload();
+  });
+  if (sessionStorage.getItem("morpion-maj")) {
+    sessionStorage.removeItem("morpion-maj");
+    setTimeout(() => toast("✨ Mise à jour installée : version " + VERSION_JEU, "succes", 3500), 800);
+  }
 }
 
 /* =========================================================
@@ -1383,6 +1409,7 @@ if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
    ========================================================= */
 
 async function demarrer() {
+  $("#version-jeu").textContent = "Version " + VERSION_JEU;
   construirePlateau();
   majBoutonSon();
   choisirOnglet("connexion");
