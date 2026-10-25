@@ -1,0 +1,20 @@
+{
+  "name": "Morpion 2.0",
+  "short_name": "Morpion 2.0",
+  "description": "Aligne 5 gemmes pour gagner. Duel local, contre l'ordinateur ou en ligne avec classement.",
+  "lang": "fr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1E1734",
+  "theme_color": "#1E1734",
+  "categories": ["games"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "logo-morpion.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
